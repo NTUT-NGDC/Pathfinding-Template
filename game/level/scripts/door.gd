@@ -48,8 +48,8 @@ const DOOR_DARK: Color = Color("5a3f28")
 ## 現在是不是開著
 var is_open: bool = false
 
-@onready var _shape: CollisionShape2D = $CollisionShape2D
 @onready var _doorway: Area2D = $Doorway
+@onready var _interact: Interactable = $Interactable
 
 
 func _enter_tree() -> void:
@@ -60,7 +60,17 @@ func _enter_tree() -> void:
 func _ready() -> void:
 	if Engine.is_editor_hint():
 		return
+	_interact.interacted.connect(_on_interacted)
 	_set_open(start_open and not locked)
+
+
+## 玩家按 E：上鎖的話有鑰匙就解鎖並打開；沒鎖就開關門
+func _on_interacted(player: Player) -> void:
+	if locked and player.has_key(key_color):
+		unlock(key_color)
+		open()
+	elif not locked:
+		toggle()
 
 
 ## 開門（上鎖的打不開）。回傳有沒有開成功
@@ -93,6 +103,7 @@ func unlock(color: String) -> bool:
 	if not locked or color != key_color:
 		return false
 	locked = false
+	_update_prompt()
 	state_changed.emit(self)
 	return true
 
@@ -105,7 +116,16 @@ func is_blocked() -> bool:
 func _set_open(value: bool) -> void:
 	is_open = value
 	collision_layer = 0 if is_open else CLOSED_LAYERS
+	_update_prompt()
 	queue_redraw()
+
+
+## 玩家頭上的提示：開門／關門／需要鑰匙
+func _update_prompt() -> void:
+	if locked:
+		_interact.prompt = "開鎖（需要%s色鑰匙）" % key_color
+	else:
+		_interact.prompt = "關門" if is_open else "開門"
 
 
 func _make_sound() -> void:

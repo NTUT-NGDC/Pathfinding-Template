@@ -1,6 +1,7 @@
 [gd_scene format=3]
 
 [ext_resource type="Script" path="res://game/level/scripts/door.gd" id="1_script"]
+[ext_resource type="Script" path="res://game/level/scripts/interactable.gd" id="2_interact"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_door"]
 size = Vector2(32, 32)
@@ -23,3 +24,13 @@ monitorable = false
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Doorway"]
 shape = SubResource("RectangleShape2D_doorway")
+
+[node name="Interactable" type="Area2D" parent="."]
+collision_layer = 16
+collision_mask = 0
+monitoring = false
+script = ExtResource("2_interact")
+prompt = "開門"
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Interactable"]
+shape = SubResource("RectangleShape2D_door")

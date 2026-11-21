@@ -1,0 +1,27 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://game/killer/scripts/killer.gd" id="1_script"]
+[ext_resource type="Script" path="res://game/ai/vision/scripts/vision_sensor.gd" id="2_vision"]
+[ext_resource type="Script" path="res://game/ai/hearing/scripts/hearing_sensor.gd" id="3_hearing"]
+[ext_resource type="Script" path="res://game/ai/navigation/scripts/path_follower.gd" id="4_follower"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_body"]
+radius = 11.0
+
+[node name="Killer" type="CharacterBody2D"]
+z_index = 2
+collision_layer = 8
+motion_mode = 1
+script = ExtResource("1_script")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_body")
+
+[node name="VisionSensor" type="Node2D" parent="."]
+script = ExtResource("2_vision")
+
+[node name="HearingSensor" type="Node2D" parent="."]
+script = ExtResource("3_hearing")
+
+[node name="PathFollower" type="Node" parent="."]
+script = ExtResource("4_follower")
