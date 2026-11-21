@@ -17,6 +17,7 @@ config/icon="res://icon.svg"
 [autoload]
 
 SoundSettings="*res://game/sound_settings/scripts/sound_settings.gd"
+SoundBus="*res://game/ai/hearing/scripts/sound_bus.gd"
 
 [display]
 

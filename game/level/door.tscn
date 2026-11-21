@@ -1,0 +1,25 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://game/level/scripts/door.gd" id="1_script"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_door"]
+size = Vector2(32, 32)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_doorway"]
+size = Vector2(30, 30)
+
+[node name="Door" type="StaticBody2D"]
+collision_layer = 3
+collision_mask = 0
+script = ExtResource("1_script")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_door")
+
+[node name="Doorway" type="Area2D" parent="."]
+collision_layer = 0
+collision_mask = 12
+monitorable = false
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Doorway"]
+shape = SubResource("RectangleShape2D_doorway")
