@@ -1,7 +1,8 @@
-[gd_resource type="AudioBusLayout" format=3]
+[gd_resource type="AudioBusLayout" format=3 uid="uid://t6b87a32x0of"]
 
 [resource]
-bus/1/name = &"Music"
+bus/0/volume_db = 0.06726074
+bus/1/name = &"BGM"
 bus/1/solo = false
 bus/1/mute = false
 bus/1/bypass_fx = false

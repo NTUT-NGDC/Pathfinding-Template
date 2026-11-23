@@ -1,0 +1,10 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://examples/chase/features/pickup/scripts/pickup_counter.gd" id="1_script"]
+
+[node name="PickupCounter" type="Label"]
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 6
+theme_override_font_sizes/font_size = 22
+text = "寶物 0/0"
+script = ExtResource("1_script")

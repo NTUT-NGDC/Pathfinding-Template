@@ -1,141 +1,97 @@
-# Pathfinding Escape Template
+# NGDC 尋路積木（Pathfinding-Template）
 
-北科遊戲研究社「每週交流會」**敵人 AI：視野與尋路**主題課的模板專案。
+北科遊戲研究社「每週協作專案」第 3 週：**尋路**。
 
-做一款**俯視角的逃脫恐怖遊戲**：在房子裡修東西、找鑰匙，完成目標後從出口逃出去，旁邊有殺手會看、會聽、會繞過障礙物追過來。房子怎麼蓋、殺手放幾隻、殺手什麼個性，都是你決定，**整堂課都不用寫程式。**
-
-唯一的規則：**上傳之前，自己一定要先過關一次**，把通關時間寫在作品頁上。
-
-## 📖 學員手冊
-
-**👉 [交流會學員手冊（Notion）](https://app.notion.com/p/2949b83c066846079f3a609f8808d513?source=copy_link)**
-
-實驗步驟、必做步驟、抽卡、匯出上傳都在手冊裡，上課時打開敵人 AI 那一頁照著做就好。
+這個 repo ＝ [起手包 Godot-GameJam-Tools](https://github.com/NTUT-NGDC/Godot-GameJam-Tools) ＋ 尋路積木（`addons/ngdc_pathfinding/`）＋ 3 個範例遊戲（`examples/`）。積木拖進場景、改檢查器就能用，沒有 AI 也能組出遊戲。
 
 ## 需要準備
 
 | 項目 | 版本 | 說明 |
 | --- | --- | --- |
 | Godot | **4.7.2**（標準版，非 .NET） | [下載頁面](https://godotengine.org/download/archive/4.7.2-stable/)。請用這個版本，其他版本可能打不開專案 |
-| Godot 匯出模板 | 4.7.2 | 匯出網頁版需要，同一個下載頁面有，或在 Godot 裡「編輯器 → 管理匯出模板」下載 |
-
-不用裝任何外掛。
+| Godot 匯出模板 | 4.7.2 | 匯出網頁版需要，在 Godot 裡「編輯器 → 管理匯出模板」下載 |
+| GitHub 帳號 | | 組隊協作用 |
 
 > 上課時教室網路慢，Godot 和匯出模板會放在社課的 USB 裡。
 
-## 取得專案
+## 開始
 
-按上方綠色的 **Code → Download ZIP**，下載後解壓縮。
+**還沒開組的 repo**：
 
-接著打開 Godot，在專案管理員按「匯入（Import）」，選資料夾裡的 `project.godot`，再按「匯入並編輯」。第一次打開會花一點時間匯入，等進度條跑完再開始。
+1. **一組一個人**按上方綠色的 **Use this template → Create a new repository**，開你們組的 repo，再把組員加成 Collaborator
+2. 每個人 clone 下來，用 Godot 匯入 `project.godot`
+3. 按 `F5`：標題 → 開始遊戲會進**追逐範例**，按 Esc 暫停
+4. 三個範例都玩一下，全組一起填 **[docs/game_overview.md](docs/game_overview.md)**：一句話（經典玩法＋變化）、從哪個範例改、分工表
+5. 把 `game_config.tres` 的 Start Scene 改成你們的主場景，開工！
 
-## 快速開始
+**已經用起手包開好 repo 了**：把這裡的 `addons/ngdc_pathfinding/` 整個資料夾複製到你們專案的 `addons/` 就能用（不用改 `project.godot`）。想參考範例的話，`examples/` 也可以一起複製。
 
-| 想做什麼 | 怎麼做 |
+## 三個範例
+
+| 範例 | 玩法 | 可以改成 |
+| --- | --- | --- |
+| [追逐](examples/chase/README.md) | 在房子裡撿齊寶物逃出去，追逐 AI 會看、會聽、會繞路追你 | 潛行、恐怖逃脫、小精靈、外送 |
+| [塔防](examples/tower_defense/README.md) | 用牆和塔排迷宮，怪即時改路；不能把路堵死 | 殭屍圍城、路網規劃 |
+| [戰棋](examples/tactics/README.md) | 點棋子看移動範圍、點格子走過去，輪流行動 | 自走棋、小隊指揮、經營 |
+
+每個範例的 README 都寫了「**不寫程式可以改什麼**」。
+
+## 尋路積木
+
+說明在 **[addons/ngdc_pathfinding/README.md](addons/ngdc_pathfinding/README.md)**：尋路地圖、跟著路徑走、視野、聲音和耳朵、追逐 AI、移動範圍、點擊移動、生怪器、除錯顯示（F1～F5）。
+
+想看 A\* 怎麼找路：打開 `addons/ngdc_pathfinding/demo/astar_lab/astar_lab.tscn` 按 `F6`。
+
+## 要改的地方
+
+| 想改什麼 | 改哪裡 |
 | --- | --- |
-| 玩玩看 | 按 `F5`，從標題畫面按「開始遊戲」 |
-| 看殺手怎麼找路 | 打開 `lesson/astar_lab/astar_lab.tscn`，按 `F6`（A* 實驗室） |
-| 沒靈感，抽一組題目 | 打開 `lesson/card_draw/card_draw.tscn`，按 `F6` |
-| 做自己的遊戲 | 打開 `my_level/my_level.tscn`，照下面的步驟改 |
+| 遊戲名稱、標語、按「開始遊戲」進去的場景、製作名單 | 雙擊 **`game_config.tres`**，在檢查器改 |
+| 你負責的功能 | `features/<功能名稱>/`（只改你自己的資料夾） |
+| 主場景 | `levels/`（指定一個人負責）；從範例改的話，把範例的場景複製到 `levels/` |
+| 標題畫面的背景圖、字的顏色 | `core/screens/title_screen.tscn` 的檢查器（只改外觀） |
 
-**操作**：`WASD` 走路（安靜）、按住 `Shift` 跑步（快，但會發出聲音）、`E` 互動（開門、躲進櫃子、修理、撿鑰匙）、`Esc` 暫停。
+贏了、輸了：程式裡呼叫 `GameFlow.win("訊息")`、`GameFlow.lose("訊息")`，或在檢查器把 signal 連過去。
 
-**除錯顯示**（遊戲中按數字鍵切換）：`1` 殺手視野錐、`2` 追擊路徑、`3` 殺手狀態、`4` 聲音圈圈、`5` 格子線。
-
-## 做自己的遊戲
-
-你的關卡是 `my_level/my_level.tscn`（一開始跟範例關卡一樣）。打開它，照順序改：
-
-### 1. 蓋房子
-
-點場景裡的 **Walls**，下方會出現 TileMap 面板，選一種 tile 在畫面上畫：
-
-| tile | 擋視線 | 擋路 | 用來做 |
-| --- | --- | --- | --- |
-| 牆（深灰） | ✅ | ✅ | 牆壁、櫃子 |
-| 玻璃（淺藍） | ❌ | ✅ | 窗戶、矮桌：看得到但過不來 |
-| 草叢（綠） | ✅ | ❌ | 布簾、高草：可以穿過去躲 |
-
-地板畫在 **Floor**（木頭或磁磚）。**沒畫地板的地方殺手不會走過去**，房子外面留空白就好。
-
-> 右鍵是擦掉。畫錯 tile（想畫玻璃卻畫成牆）是最常見的問題，畫完按 `F6` 跑一次、按 `5` 看格子線確認。
-
-### 2. 放門、任務、躲藏點
-
-從「檔案系統」面板把場景拖進關卡（拖到最上層的 Level 節點底下）：
-
-| 場景 | 在哪 | 檢查器可以調 |
-| --- | --- | --- |
-| 門 | `game/level/door.tscn` | 方向（橫／直）、上鎖、鑰匙顏色、開關門的聲音 |
-| 躲藏點 | `game/level/hiding_spot.tscn` | 外觀（櫃子／床） |
-| 修理點 | `game/tasks/repair_point.tscn` | 要修幾秒、多久發出一次聲音、聲音多大 |
-| 鑰匙 | `game/tasks/key.tscn` | 顏色（要跟上鎖的門一樣） |
-
-- 門要放在牆的缺口上，遊戲開始時會自動對齊格子
-- 躲進櫃子殺手就看不到你，但**如果殺手親眼看到你躲進去，會走過來把你抓出來**
-
-### 3. 設定出口
-
-出口是 `game/tasks/exit.tscn`，放在外牆的缺口上。
-
-- 「Require All Tasks」打勾（預設）：關卡裡所有修理點、鑰匙都完成才打開
-- 不打勾：只看「Required Tasks」清單，把要完成的任務節點拖進去
-
-### 4. 放殺手
-
-把 `game/killer/killer.tscn` 拖進關卡，放幾隻都可以。
-
-- **巡邏點**：在殺手底下加幾個 **Marker2D**（右鍵殺手 → 新增子節點 → Marker2D），拖到你要它走的地方。編輯器裡會畫出橘色的巡邏路線
-- **個性**：視野距離、視野角度、巡邏速度、追擊速度、反應時間（看到你多久才開始追）、搜尋時間、轉頭速度、聽力範圍倍率、開門要幾秒
-- **開關**：有聽覺、牆會擋視線、檢查角度、記住最後位置、使用尋路
-
-殺手會：照巡邏點走 → 聽到聲音過去**查看** → 看到你頭上出現 **?**（懷疑） → 警戒值滿了變 **!** 追過來 → 追丟了去最後看到你的地方**搜尋** → 找不到再回去巡邏。
-
-### 5. 害怕還是公平？
-
-點最上層的 **Level** 節點，在檢查器的「害怕 vs 公平」：
-
-| 設定 | 公平 | 恐怖 |
-| --- | --- | --- |
-| Show Killer Cones（顯示殺手視野錐） | 開：知道哪裡安全 | 關：不知道它在看哪 |
-| Player Light（玩家視野圈）＋半徑 | 關掉或開大 | 開小、外面很暗 |
-| Proximity Warning（接近警告） | 開：殺手靠近時畫面邊緣變紅 | 關 |
-
-沒有標準答案，想清楚你要讓玩家**害怕**，還是**覺得公平**。
-
-### 6. 自己過關一次
-
-按 `F5` 從標題畫面玩一次，記下通關時間。過不了的話：減少殺手、加長反應時間、多放躲藏點。
-
-想改遊戲名稱、作者：打開 `game/title_screen/title_screen.tscn`，改 GameName 和 Hook 的文字。
-
-## ⚠️ 一定要記得
-
-- **巡邏點要放在殺手「底下」**（是殺手的子節點），不然殺手會站著不動
-- **出口沒有任務可以等的話，一開始就是開的**：記得放任務
-- **殺手、任務、巡邏點不要放在牆裡面**，會卡住
-- **搬移、改名檔案一律在 Godot 的「檔案系統」面板裡做**，不要用檔案總管
-
-## 專案結構
+## 資料夾
 
 | 資料夾 | 內容 |
 | --- | --- |
-| `my_level/` | **你的關卡** |
-| `example/levels/` | 範例關卡（小房子），可以打開參考 |
-| `game/` | 遊戲零件：玩家、殺手、門、任務、標題畫面……（會跟著匯出） |
-| `game/ai/` | 殺手的視野（vision）、聽覺（hearing）、尋路（navigation），各自是獨立的元件 |
-| `lesson/` | 社課工具：A* 實驗室、抽卡（不會匯出） |
-| `_system/` | 字型、測試，不用看 |
+| `core/` | 起手包，**不要改**（更新時整包換） |
+| `addons/` | 技術積木，**不要改**（更新時整包換） |
+| `examples/` | 範例遊戲，可以複製出來改 |
+| `features/` | 每個功能一個資料夾、一個人負責 |
+| `levels/` | 主場景，一個人負責組裝 |
+| `shared/` | 大家都會用的東西，改之前先在組裡講 |
+| `docs/` | 遊戲概要、分工表、協作規則、給 AI 的說明 |
+
+## ⚠️ 協作規則（一定要看）
+
+詳細在 **[docs/collaboration.md](docs/collaboration.md)**，重點：
+
+- **每個人只動自己的資料夾**；主場景、`project.godot`、`game_config.tres` 由一個人改
+- **每 20～30 分鐘合併一次**，開工前先 `git pull`
+- `.tscn`、`.tres` 衝突了不要手動合併：選一邊保留，再把另一邊的小改動重做
+- `.uid` 檔要 commit
+
+## 用 AI 的話
+
+`CLAUDE.md`、`AGENTS.md`、`GEMINI.md` 會讓 Claude Code、Codex、Gemini CLI 自動讀到 **[docs/ai_guide.md](docs/ai_guide.md)**：已經有哪些功能和積木、怎麼用、只能改哪些資料夾。
+
+下指令時講清楚：用哪個現成的東西、要做什麼、**不要重寫什麼**。例如：
+
+> 專案裡已經有 `addons/ngdc_pathfinding` 的生怪器和尋路地圖（說明在它的 README）。幫我在 `features/slow_tower/` 加一種緩速塔：範圍內的敵人速度減半，持續 2 秒。不要重寫生怪器。
 
 ## 上傳作品
 
 1. 「專案 → 匯出」，選 **Web**，按「匯出專案」，存到 `build/index.html`
 2. 把 `build` 資料夾裡的檔案全部壓成一個 zip
-3. 上傳到 itch.io（Kind of project 選 HTML），作品頁寫上自己的**通關時間**，再提交到社團的 Jam（週次選 W3）：
+3. 上傳到 itch.io（Kind of project 選 HTML），再提交到社團的 Jam：
 
 **🎮 [115-1 北科遊戲研究社交流會作品集](https://itch.io/jam/ntut-ngdc-meetup-115-1)**
 
-## 參考與授權
+想幫忙開發：看 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
-- 殺手在遊戲裡用 Godot 內建的 `AStarGrid2D` 找路；A* 實驗室的 BFS／A* 是自己寫的（為了看到中間過程），在 `lesson/astar_lab/scripts/grid_search.gd`
-- 字型：俐方體 11 號（Cubic 11），SIL Open Font License 1.1，授權全文在 `_system/fonts/Cubic_11_OFL.txt`
+## 授權
+
+- 字型：俐方體 11 號（Cubic 11），SIL Open Font License 1.1，授權全文在 `core/fonts/Cubic_11_OFL.txt`
