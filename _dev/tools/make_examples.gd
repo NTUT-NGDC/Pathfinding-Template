@@ -3,7 +3,7 @@ extends Node
 ##   godot --headless --path . res://_dev/tools/make_examples.tscn
 ## 加上 `-- chase`／`-- tower_defense`／`-- tactics` 只產生其中一個。
 ##
-## 追逐：P 玩家　M 巡邏的追逐 AI（1～4 巡邏點）　N 守衛　T 寶物　K 紅鑰匙　L 紅色上鎖的門　D／d 門　R 任務點（發電機）　C／E 躲藏點　X 出口
+## 追逐：P 玩家　M 巡邏的追逐 AI（1～4 巡邏點）　N 守衛　T 寶物　K 紅鑰匙　L 紅色上鎖的門　D／d 門　R 任務點（發電機）　^ 捕獸夾　! 警報　o 瓶子　C／E 躲藏點　X 出口
 ## 共用符號：# 牆　G 玻璃　b 草叢　~ 沼澤　. 木頭地板　, 磁磚地板　空白＝房子外面
 
 const TILE: int = 32
@@ -16,17 +16,17 @@ const CHASE_MAP: PackedStringArray = [
 	"#........#,,,,,,,,,,,,,,#..........#",
 	"#..E..K..#,,,,,,,,,,,,,,#....T.....#",
 	"#........#,,,,,,,,,,,,,,#..........#",
-	"#....T...D,,,,,,,,,,,,,,D.......N..#",
+	"#....T...D,,,,,,,,,,,,,,D.^.....N..#",
 	"#........#,,,,,,,,,,,,,,#.....C....#",
 	"###GGG####,,,,,bbb,,,,,,###GGG######",
-	"#........#,,,,,bbb,,,,,,,,,,,,,,,,,#",
+	"#....o...#,,,,,bbb,,,,,,,,,,,,,,,,,#",
 	"#........#,,,,,,,,,,,,,,,,,,,,R,,,,#",
 	"#..P.....D,,1M,,,,,,,,,2,,,,,,,,,,,#",
 	"#........#,,,,,,,,,,,,,,,,,,,,,,,,,#",
 	"#...C....#,,,,,,,,,,,,,,#####L######",
-	"#........G,,,,,,,,,,,,,,#..........#",
+	"#........G,,,,,,,,,,,,,,#....!.....#",
 	"#........G,,,,,,,,bbb,,,#....T.....#",
-	"#........#,,,,,,,,bbb,,,#..........#",
+	"#........#,,,,,,,,bbb,o,#..........#",
 	"#........#,,,,,,,,,,,,,,#....E.....#",
 	"#........#,,4,,,,,,,,,3,#..........#",
 	"################X###################",
@@ -124,6 +124,12 @@ func _build_chase() -> Node2D:
 					key.set("required", false)
 				"R":
 					_instance("res://examples/chase/features/task_point/task_point.tscn", "Generator", at, counts)
+				"^":
+					_instance("res://examples/chase/features/trap/trap.tscn", "Trap", at, counts)
+				"!":
+					_instance("res://examples/chase/features/alarm/alarm.tscn", "Alarm", at, counts)
+				"o":
+					_instance("res://examples/chase/features/throwable/bottle.tscn", "Bottle", at, counts)
 				"C", "E":
 					var spot: Node2D = _instance("res://examples/chase/features/hiding_spot/hiding_spot.tscn", "HidingSpot", at, counts)
 					spot.set("style", 0 if CHASE_MAP[y][x] == "C" else 1)
@@ -140,6 +146,8 @@ func _build_chase() -> Node2D:
 		marker.position = markers[keys[i]] - killer_at
 		killer.add_child(marker)
 		marker.owner = _root
+	# 追丟人時在腳下放捕獸夾
+	_add((load("res://examples/chase/features/trap/trap_dropper.tscn") as PackedScene).instantiate(), "TrapDropper", killer)
 	# 守在工作室的那一隻：沒有巡邏點，站著張望；比較慢反應
 	var guard: ChaseAI = _instance("res://addons/ngdc_pathfinding/chase_ai/chase_ai.tscn", "Guard", guard_at, counts)
 	guard.start_angle = 180.0
@@ -157,7 +165,8 @@ func _build_chase() -> Node2D:
 	var box: VBoxContainer = _add(VBoxContainer.new(), "Info", hud)
 	box.position = Vector2(22, 12)
 	_instance_ui("res://examples/chase/features/exit/objective_counter.tscn", "ObjectiveCounter", box)
-	_hint(box, "WASD 移動　Shift 跑（會發出聲音）　E 互動　F1～F5 除錯")
+	_instance_ui("res://examples/chase/features/throwable/bottle_counter.tscn", "BottleCounter", box)
+	_hint(box, "WASD 移動　Shift 跑（會發出聲音）　E 互動　1 丟瓶子　F1～F5 除錯")
 	return _root
 
 
@@ -279,7 +288,7 @@ func _paint(map: PackedStringArray) -> Array[TileMapLayer]:
 
 ## 角色、門這些符號底下鋪什麼地板：旁邊是磁磚就鋪磁磚
 func _near_tile(map: PackedStringArray, x: int, y: int) -> bool:
-	if not "123456789MNXR".contains(map[y][x]):
+	if not "123456789MNXR^!o".contains(map[y][x]):
 		return false
 	return (x > 0 and map[y][x - 1] == ",") or (x < map[y].length() - 1 and map[y][x + 1] == ",") or map[y][x] == "X"
 

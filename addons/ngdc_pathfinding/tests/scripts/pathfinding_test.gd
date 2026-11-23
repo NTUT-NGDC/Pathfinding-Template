@@ -260,6 +260,11 @@ func _test_click_mover() -> void:
 	mover.allow_multi_select = false
 	mover.select(units)
 	_expect(mover.selected.size() == 1, "不能多選：只留一個")
+	mover.allow_multi_select = true
+	mover.select(units)
+	units[0].free()                                               # 選到的角色被刪掉（例如被打死）
+	await _frames(3)
+	_expect(mover.selected.size() == 2, "選到的角色被刪掉：從選取裡拿掉（%d）" % mover.selected.size())
 
 
 # ---- 工具 ----

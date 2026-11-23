@@ -217,6 +217,20 @@ func register_obstacle(node: Node2D) -> void:
 	_apply_obstacle(cell, node)
 
 
+## 取消登記障礙物（例如陷阱消失了）：那一格回到 tile 原本的樣子
+func unregister_obstacle(node: Node2D) -> void:
+	var cell: Vector2i = cell_of(node.global_position)
+	if _obstacles.get(cell) != node:
+		return
+	_obstacles.erase(cell)
+	_blocked.erase(cell)
+	_costs.erase(cell)
+	if node.has_signal("obstacle_changed") and node.is_connected("obstacle_changed", _on_obstacle_changed.bind(node)):
+		node.disconnect("obstacle_changed", _on_obstacle_changed.bind(node))
+	_refresh_cell(cell)
+	map_changed.emit()
+
+
 ## 某一格的障礙物（沒有就是 null）
 func obstacle_at(cell: Vector2i) -> Node2D:
 	return _obstacles.get(cell, null)

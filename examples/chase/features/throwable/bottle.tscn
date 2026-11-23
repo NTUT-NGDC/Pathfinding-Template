@@ -1,0 +1,21 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://examples/chase/features/throwable/scripts/bottle.gd" id="1_script"]
+[ext_resource type="Script" path="res://examples/chase/features/interact/scripts/interactable.gd" id="2_interact"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_bottle"]
+size = Vector2(32, 32)
+
+[node name="Bottle" type="Node2D"]
+z_index = 1
+script = ExtResource("1_script")
+
+[node name="Interactable" type="Area2D" parent="."]
+collision_layer = 16
+collision_mask = 0
+monitoring = false
+script = ExtResource("2_interact")
+prompt = "撿瓶子"
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Interactable"]
+shape = SubResource("RectangleShape2D_bottle")

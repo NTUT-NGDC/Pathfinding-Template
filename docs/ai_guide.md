@@ -81,7 +81,7 @@ game_config.tres   遊戲名稱、開始場景、Credits 名單
 
 | 範例 | 用到的積木 | 可以改成 |
 | --- | --- | --- |
-| `examples/chase/`：在房子裡拿東西、修發電機逃出去，被追逐 AI 追（出口條件看「目標」接口：group `objectives`＋`required`／`is_done`／`category`＋`completed`，說明在範例 README） | 尋路地圖、追逐 AI、視野、聲音 | 潛行、恐怖逃脫、小精靈、外送 |
+| `examples/chase/`：在房子裡拿東西、修發電機逃出去，被追逐 AI 追；有捕獸夾（AI 追丟會放）、警報、可以丟的瓶子（出口條件看「目標」接口：group `objectives`＋`required`／`is_done`／`category`＋`completed`，說明在範例 README） | 尋路地圖、追逐 AI、視野、聲音 | 潛行、恐怖逃脫、小精靈、外送 |
 | `examples/tower_defense/`：點格子放牆／塔，怪即時改路 | 尋路地圖、生怪器、跟著路徑走 | 塔防、殭屍圍城、路網規劃 |
 | `examples/tactics/`：點角色看移動範圍、點格子走過去 | 尋路地圖、移動範圍、跟著路徑走 | 戰棋、自走棋、小隊指揮、經營 |
 

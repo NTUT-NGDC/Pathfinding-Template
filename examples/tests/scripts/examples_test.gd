@@ -2,6 +2,7 @@ extends Node
 ## 三個範例的自動測試：
 ## 1. 追逐：寶物 3 個＋發電機、都完成出口才打開、走進出口就贏；開門條件（全部／指定／數量／一開始就開）；
 ##    守衛被聲音引開後會走回崗位；站在門口按 E 會退出去把門關上；
+##    捕獸夾（AI 繞開、夾住、AI 追丟會放）、警報（AI 過來、冷卻）、瓶子（撿、丟、撞牆、引開守衛）；
 ##    發電機會發出聲音；鏡頭固定在畫面中間；被追逐 AI 碰到就輸；上鎖的門要鑰匙
 ## 2. 塔防：蓋牆扣錢、不能把路堵死、錢不夠蓋不了、塔會打怪、怪走到基地扣血
 ## 3. 戰棋：點棋子亮出移動範圍、走過去、走到敵人旁邊會攻擊、敵方回合往我方靠近
@@ -85,6 +86,10 @@ func _test_chase() -> void:
 	await _test_open_conditions()
 	await _test_guard_returns()
 	await _test_close_door_in_doorway()
+	await _test_trap()
+	await _test_trap_dropper()
+	await _test_alarm()
+	await _test_bottle()
 
 	await _load(CHASE)
 	player = get_tree().get_first_node_in_group("player")
@@ -158,6 +163,117 @@ func _test_close_door_in_doorway() -> void:
 	_expect(not door.is_open and offset.is_equal_approx(-axis * Door.STEP_OUT_DISTANCE), "站在門口按 E：門關上、玩家退到比較近的那一側（%s）" % offset)
 	await _frames(3)
 	_expect(not door.is_blocked() and player.global_position.distance_to(door.global_position + offset) < 1.0, "退出去之後沒有卡在門裡")
+
+
+## 捕獸夾：AI 會繞開；玩家踩到被夾住、發出聲音；夾完消失，那一格回到原本的成本
+func _test_trap() -> void:
+	await _load(CHASE)
+	_freeze_group("chase_ai")
+	var player: Player = get_tree().get_first_node_in_group("player")
+	var grid: PathGrid = get_tree().get_first_node_in_group("path_grid")
+	var trap: Trap = _level.get_node("Trap")
+	var cell: Vector2i = grid.cell_of(trap.global_position)
+	_expect(grid.cost_of(cell) == Trap.AVOID_COST, "捕獸夾：尋路地圖登記成很貴的格子（%.0f）" % grid.cost_of(cell))
+	var path: PackedVector2Array = grid.find_path(grid.cell_center(cell + Vector2i.LEFT), grid.cell_center(cell + Vector2i.RIGHT))
+	_expect(not path.is_empty() and not path.has(grid.cell_center(cell)), "捕獸夾：AI 的路繞開它")
+	var heard: Array[float] = []
+	SoundBus.instance().sound_emitted.connect(func(_p: Vector2, radius: float) -> void: heard.append(radius))
+	player.global_position = trap.global_position
+	await _frames(3)
+	_expect(trap.is_closed and player.stun_time > 0.0 and heard.has(trap.sound_radius), "踩到捕獸夾：被夾住、發出聲音")
+	Input.action_press("move_right")
+	await _frames(10)
+	Input.action_release("move_right")
+	_expect(player.global_position.distance_to(trap.global_position) < 1.0, "被夾住：按方向鍵也不能動")
+	var trap_ref: WeakRef = weakref(trap)                         # 夾子會被刪掉，lambda 不能直接抓它
+	await _wait_until(func() -> bool: return trap_ref.get_ref() == null, 300)
+	_expect(not is_instance_valid(trap) and player.stun_time == 0.0 and grid.cost_of(cell) == 1.0, "夾完：夾子消失、可以動、那一格回到原本的成本")
+
+
+## 追逐 AI 追丟（進入搜尋）時在腳下放捕獸夾，最多 3 個
+func _test_trap_dropper() -> void:
+	await _load(CHASE)
+	_freeze_group("chase_ai")
+	var grid: PathGrid = get_tree().get_first_node_in_group("path_grid")
+	var killer: ChaseAI = _level.get_node("ChaseAI")
+	var dropper: TrapDropper = killer.get_node("TrapDropper")
+	var before: int = get_tree().get_nodes_in_group("traps").size()
+	killer.call("_set_state", ChaseAI.State.SEARCH)
+	await _frames(2)
+	var cell: Vector2i = grid.cell_of(killer.global_position)
+	_expect(get_tree().get_nodes_in_group("traps").size() == before + 1 and grid.obstacle_at(cell) is Trap, "追丟了（搜尋）：在腳下放一個捕獸夾")
+	for i: int in 4:
+		killer.global_position = grid.cell_center(cell + Vector2i(i + 1, 1))
+		dropper.drop()
+		await _frames(2)
+	_expect(dropper.traps.size() == dropper.max_traps and grid.obstacle_at(cell) == null, "最多 %d 個：最舊的消失、那一格取消登記" % dropper.max_traps)
+	# 玩家踩掉其中一個（夾子被刪掉），AI 再放一個：清單要正常（以前這裡會報 Array 型別錯誤）
+	var player: Player = get_tree().get_first_node_in_group("player")
+	var stepped: Node2D = dropper.traps[0]
+	player.global_position = stepped.global_position
+	await _wait_until(func() -> bool: return player.stun_time > 0.0, 30)
+	await _wait_until(func() -> bool: return player.stun_time == 0.0, 300)
+	await _frames(2)
+	killer.global_position = grid.cell_center(cell + Vector2i(1, 3))
+	dropper.dropped_one_shot = false
+	var added: Node2D = dropper.drop()
+	var all_valid: bool = true
+	for item: Variant in dropper.traps:
+		all_valid = all_valid and is_instance_valid(item)
+	_expect(added != null and dropper.traps.size() == dropper.max_traps and all_valid, "踩掉一個再放：清單只留還在的（%d 個）" % dropper.traps.size())
+	_expect(added != null and (added as Trap).one_shot == false, "放下的夾子踩過會不會消失：照 TrapDropper 的設定")
+
+
+## 警報：踩到發出大聲音，附近的 AI 過來查看；冷卻中不會再響
+func _test_alarm() -> void:
+	await _load(CHASE)
+	_level.get_node("ChaseAI").process_mode = Node.PROCESS_MODE_DISABLED
+	var player: Player = get_tree().get_first_node_in_group("player")
+	var alarm: Alarm = _level.get_node("Alarm")
+	var guard: ChaseAI = _level.get_node("Guard")
+	var rings: Array[int] = [0]
+	alarm.rang.connect(func(_p: Player) -> void: rings[0] += 1)
+	player.global_position = alarm.global_position
+	await _frames(3)
+	_expect(rings[0] == 1 and guard.state == ChaseAI.State.INVESTIGATE, "踩到警報：響了、守衛過來查看")
+	player.global_position = alarm.global_position + Vector2(64, 0)
+	await _frames(3)
+	player.global_position = alarm.global_position
+	await _frames(3)
+	_expect(rings[0] == 1, "冷卻中：再踩一次不會響")
+
+
+## 瓶子：撿起來、按 1 丟出去，撞牆停在牆前面，落地的聲音把守衛引過去
+func _test_bottle() -> void:
+	await _load(CHASE)
+	_level.get_node("ChaseAI").process_mode = Node.PROCESS_MODE_DISABLED
+	var player: Player = get_tree().get_first_node_in_group("player")
+	var grid: PathGrid = get_tree().get_first_node_in_group("path_grid")
+	var guard: ChaseAI = _level.get_node("Guard")
+	var counter: Label = _level.get_node("HUD/Info/BottleCounter")
+	_expect(not counter.visible, "沒有瓶子：不顯示瓶子數")
+	(_level.get_node("Bottle") as Bottle).call("_on_interacted", player)
+	(_level.get_node("Bottle2") as Bottle).call("_on_interacted", player)
+	await _frames(2)
+	_expect(player.bottles == 2 and counter.visible and counter.text.begins_with("瓶子 2"), "撿 2 個瓶子（%s）" % counter.text)
+	# 往牆丟：停在牆前面
+	var start_cell: Vector2i = grid.cell_of(player.global_position)
+	var wall_x: float = grid.cell_center(Vector2i(0, start_cell.y)).x + 16.0
+	var landing: Vector2 = ThrownBottle.landing_point(player, Vector2.LEFT, player.throw_distance)
+	_expect(landing.x > wall_x and landing.x < wall_x + 20.0, "往牆丟：停在牆前面（%.0f）" % (landing.x - wall_x))
+	# 在守衛正後方往前丟（守衛面向左，張望也看不到正後方）：守衛聽到、過去查看
+	player.global_position = guard.global_position + Vector2(64, 0)
+	player.facing = Vector2.LEFT
+	var heard: Array[Vector2] = []
+	var bottle_radius: float = player.bottle_sound_radius
+	SoundBus.instance().sound_emitted.connect(func(p: Vector2, radius: float) -> void:
+		if radius == bottle_radius: heard.append(p))
+	await _frames(2)
+	_expect(player.throw_bottle() and player.bottles == 1, "按 1：丟出去，剩 1 個")
+	await _wait_until(func() -> bool: return not heard.is_empty(), 120)
+	await _frames(3)
+	_expect(not heard.is_empty() and heard[0].distance_to(player.global_position) > 100.0, "瓶子落地：發出聲音")
+	_expect(guard.state == ChaseAI.State.INVESTIGATE, "守衛聽到瓶子：過去查看")
 
 
 ## 守衛（沒有巡邏點）被聲音引開，查看完會走回崗位

@@ -1,6 +1,7 @@
 class_name Player
 extends CharacterBody2D
-## 玩家：WASD 走路（安靜）、按住 Shift 跑步（快，但會發出聲音）、E 互動（開門、躲藏、撿東西）。
+## 玩家：WASD 走路（安靜）、按住 Shift 跑步（快，但會發出聲音）、E 互動（開門、躲藏、撿東西）、
+## 1 丟瓶子（落地的聲音會把追逐 AI 引過去）。踩到捕獸夾會被夾住幾秒不能動。
 ## 追逐 AI 碰到就被抓（追逐 AI 會呼叫 get_caught()）；躲在櫃子裡看不到、抓不到，
 ## 但被追逐 AI 親眼看到躲進去的話會被拖出來（追逐 AI 會聽 hid signal）。
 ## 從打開的出口出去就贏了（呼叫起手包的 GameFlow.win()，顯示通關時間）。
@@ -11,6 +12,10 @@ extends CharacterBody2D
 signal caught()
 ## 從出口逃出去了
 signal escaped()
+## 身上的瓶子數變了
+signal bottles_changed(count: int)
+## 被夾住（捕獸夾）
+signal stunned(seconds: float)
 ## 躲進躲藏點
 signal hid(spot: Node2D)
 ## 從躲藏點出來
@@ -27,6 +32,14 @@ signal unhid(spot: Node2D)
 @export_range(0, 800, 10, "suffix:px") var run_sound_radius: float = 260.0
 ## 跑步時每隔幾秒發出一次腳步聲
 @export_range(0.1, 2.0, 0.05, "suffix:秒") var run_sound_interval: float = 0.35
+
+@export_group("瓶子")
+## 一開始身上有幾個瓶子
+@export_range(0, 20) var start_bottles: int = 0
+## 瓶子丟多遠（像素），撞到牆會停在牆前面
+@export_range(40, 600, 10, "suffix:px") var throw_distance: float = 220.0
+## 瓶子碎掉的聲音傳多遠（像素）
+@export_range(0, 800, 10, "suffix:px") var bottle_sound_radius: float = 350.0
 
 ## 從開始到現在幾秒（逃出去時顯示通關時間）
 var elapsed: float = 0.0
@@ -47,6 +60,10 @@ var keys: Array[String] = []
 var facing: Vector2 = Vector2.DOWN
 ## 現在是不是在跑（有在移動而且按著 Shift）
 var is_running: bool = false
+## 身上有幾個瓶子
+var bottles: int = 0
+## 被夾住還剩幾秒（0＝沒被夾住）
+var stun_time: float = 0.0
 
 var _hiding_spot: Node2D
 ## 躲進去之前站的位置，出來時回到這裡
@@ -67,16 +84,24 @@ func _enter_tree() -> void:
 func _ready() -> void:
 	collision_layer = PLAYER_LAYER
 	collision_mask = PATH_LAYER
+	bottles = start_bottles
 
 
 func _physics_process(delta: float) -> void:
 	if is_finished:
 		return
 	elapsed += delta
+	if stun_time > 0.0:
+		stun_time = maxf(stun_time - delta, 0.0)                  # 被夾住：不能動、不能互動
+		_prompt.visible = false
+		queue_redraw()
+		return
 	_update_interaction(delta)
 	if is_hidden:
 		return
 	_move(delta)
+	if Input.is_action_just_pressed("skill_1"):
+		throw_bottle()
 	queue_redraw()
 
 
@@ -199,9 +224,43 @@ func has_key(color: String) -> bool:
 	return keys.has(color)
 
 
+## 撿到瓶子
+func add_bottles(count: int) -> void:
+	bottles += count
+	bottles_changed.emit(bottles)
+
+
+## 往面向的方向丟一個瓶子（按 1）。回傳有沒有丟出去
+func throw_bottle() -> bool:
+	if bottles <= 0 or is_hidden or is_finished or stun_time > 0.0:
+		return false
+	bottles -= 1
+	bottles_changed.emit(bottles)
+	ThrownBottle.throw(self, facing, throw_distance, bottle_sound_radius)
+	return true
+
+
+## 被夾住幾秒不能動（捕獸夾呼叫）
+func stun(seconds: float) -> void:
+	if is_finished or seconds <= 0.0:
+		return
+	stun_time = maxf(stun_time, seconds)
+	velocity = Vector2.ZERO
+	is_running = false
+	if _holding != null:
+		_holding.released.emit(self)
+		_holding = null
+	stunned.emit(seconds)
+
+
 func _draw() -> void:
 	if is_hidden:
 		return                                                    # 躲起來：不畫身體（頭上的提示還在）
 	draw_circle(Vector2.ZERO, 11.0, OUTLINE_COLOR)
 	draw_circle(Vector2.ZERO, 9.0, BODY_COLOR)
 	draw_circle(facing * 5.0, 3.0, OUTLINE_COLOR)                 # 看的方向
+	if stun_time > 0.0:
+		# 被夾住：頭上轉圈的星星
+		for i: int in 3:
+			var at: Vector2 = Vector2(0, -18) + Vector2.from_angle(elapsed * 6.0 + TAU * i / 3.0) * Vector2(9, 3)
+			draw_circle(at, 2.0, Color("ffd75e"))

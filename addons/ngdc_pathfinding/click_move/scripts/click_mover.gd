@@ -122,7 +122,12 @@ func _process(_delta: float) -> void:
 
 
 func _draw() -> void:
-	selected = selected.filter(func(unit: Node2D) -> bool: return is_instance_valid(unit))
+	# 拿掉已經刪掉的單位（不能用 filter＋型別 lambda，刪掉的東西傳進去會出錯）
+	var alive: Array[Node2D] = []
+	for item: Variant in selected:
+		if is_instance_valid(item):
+			alive.append(item)
+	selected = alive
 	for unit: Node2D in selected:
 		draw_arc(to_local(unit.global_position), pick_radius, 0.0, TAU, 24, select_color, 2.0)
 	if _dragging and allow_multi_select:
