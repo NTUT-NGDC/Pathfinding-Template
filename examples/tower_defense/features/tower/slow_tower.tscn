@@ -1,0 +1,11 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://examples/tower_defense/features/tower/tower.tscn" id="1_tower"]
+[ext_resource type="PackedScene" path="res://examples/tower_defense/features/tower_traits/slow.tscn" id="2_trait"]
+
+[node name="SlowTower" instance=ExtResource("1_tower")]
+cost = 6
+color = Color(0.45, 0.75, 0.95, 1)
+damage = 0.5
+
+[node name="Slow" parent="." instance=ExtResource("2_trait")]

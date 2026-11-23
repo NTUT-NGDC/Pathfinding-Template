@@ -1,0 +1,8 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://examples/tower_defense/features/hud/scripts/speed_button.gd" id="1_script"]
+
+[node name="SpeedButton" type="Button"]
+custom_minimum_size = Vector2(72, 36)
+text = "▶ 1×"
+script = ExtResource("1_script")

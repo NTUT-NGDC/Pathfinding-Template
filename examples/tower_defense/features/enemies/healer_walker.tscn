@@ -1,0 +1,9 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://addons/ngdc_pathfinding/spawner/walker.tscn" id="1_walker"]
+[ext_resource type="PackedScene" path="res://examples/tower_defense/features/enemy_traits/healer.tscn" id="2_healer"]
+
+[node name="HealerWalker" instance=ExtResource("1_walker")]
+color = Color(0.4, 0.75, 0.45, 1)
+
+[node name="Healer" parent="." instance=ExtResource("2_healer")]

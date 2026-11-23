@@ -32,8 +32,8 @@ W3「尋路」的技術積木。每個積木都是一個場景，**拖進場景�
 | **追逐 AI** `chase_ai/chase_ai.tscn` | 巡邏 → 查看聲音 → 懷疑 ? → 追擊 ! → 搜尋最後位置；底下加 Marker2D 當巡邏點 | 個性（視野、速度、反應時間、搜尋時間……）、開關（牆擋視線、檢查角度、記住最後位置、使用尋路）、抓到就輸 | `caught(target)`、`state_changed` |
 | **移動範圍** `move_range/move_range.tscn` | `show_from(位置, 移動力)` 亮出走得到的格子（吃移動成本） | 顏色、能不能點 | `tile_selected(cell)`、`cancelled` |
 | **點擊移動** `click_move/click_mover.tscn` | 點選／框選角色（group「units」，底下要有 PathFollower），點地圖就走過去 | 可否多選、散開距離 | `selection_changed`、`commanded` |
-| **生怪器** `spawner/spawner.tscn` | 照波次表出怪，怪自動走向目標 | 目標、波次表（出幾隻、間隔、速度、血量）、走到就輸、打完就贏 | `wave_started`、`spawned`、`reached_goal`、`all_cleared` |
-| **小怪** `spawner/walker.tscn` | 生怪器預設出的怪，`damage(n)` 扣血 | 速度、血量、分數、顏色 | `died` |
+| **生怪器** `spawner/spawner.tscn` | 照波次表出怪，怪自動走向目標；`adopt(怪, 位置)` 把別的地方生出來的怪（例如分裂）也交給它管 | 目標、波次表（出幾隻、間隔、速度、血量）、走到就輸、打完就贏 | `wave_started`、`spawned`、`reached_goal`、`all_cleared` |
+| **小怪** `spawner/walker.tscn` | 生怪器預設出的怪，`damage(n)` 扣血、`heal(n)` 補血、`slow(倍率, 秒)` 緩速 | 速度、血量、分數、顏色 | `died` |
 
 ### 除錯顯示（遊戲中按）
 

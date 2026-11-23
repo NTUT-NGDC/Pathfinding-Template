@@ -11,9 +11,12 @@ extends Node
 ## 在命令列執行：
 ##   godot --headless --path . res://addons/ngdc_pathfinding/tests/astar_lab_test.tscn
 
+const ScriptErrors = preload("res://core/tests/scripts/script_error_counter.gd")
 const LAB_SCENE: PackedScene = preload("res://addons/ngdc_pathfinding/demo/astar_lab/astar_lab.tscn")
 
 var _failures: int = 0
+## 腳本錯誤也算失敗（會讓測試函式中斷、跑不到 _expect）
+var _script_errors: ScriptErrors = ScriptErrors.new()
 
 
 func _ready() -> void:
@@ -26,6 +29,7 @@ func _ready() -> void:
 	_test_swamp()
 	await _test_scene()
 
+	_failures += _script_errors.report()
 	if _failures == 0:
 		print("[A* 實驗室測試] 全部 PASS")
 		get_tree().quit(0)

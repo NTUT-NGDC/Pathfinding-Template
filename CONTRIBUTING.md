@@ -67,7 +67,7 @@
 - 附自動測試，用 headless 跑，失敗時 exit code 非 0：
   - `godot --headless --path . res://core/tests/core_test.tscn`
   - `godot --headless --path . res://addons/ngdc_pathfinding/tests/pathfinding_test.tscn`（還有 `chase_ai_test`、`astar_lab_test`）
-  - `godot --headless --path . res://examples/tests/examples_test.tscn`
+  - `godot --headless --path . res://examples/_tests/examples_test.tscn`
 - 範例的關卡用 `_dev/tools/make_examples.tscn` 從文字地圖產生，改地圖改那裡
 - 更新 `addons/ngdc_pathfinding/README.md` 和 `docs/ai_guide.md`：有什麼、怎麼用、不要重寫什麼
 

@@ -1,0 +1,9 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://addons/ngdc_pathfinding/spawner/walker.tscn" id="1_walker"]
+[ext_resource type="PackedScene" path="res://examples/tower_defense/features/enemy_traits/split.tscn" id="2_split"]
+
+[node name="Splitter" instance=ExtResource("1_walker")]
+color = Color(0.85, 0.45, 0.7, 1)
+
+[node name="Split" parent="." instance=ExtResource("2_split")]

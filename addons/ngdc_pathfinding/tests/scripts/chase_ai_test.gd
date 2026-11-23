@@ -9,6 +9,7 @@ extends Node
 ## 在命令列執行：
 ##   godot --headless --path . res://addons/ngdc_pathfinding/tests/chase_ai_test.tscn
 
+const ScriptErrors = preload("res://core/tests/scripts/script_error_counter.gd")
 const TILESET: TileSet = preload("res://addons/ngdc_pathfinding/grid/tileset/tileset.tres")
 const TestTarget: GDScript = preload("res://addons/ngdc_pathfinding/tests/scripts/test_target.gd")
 const CHASE_SCENE: PackedScene = preload("res://addons/ngdc_pathfinding/chase_ai/chase_ai.tscn")
@@ -16,6 +17,8 @@ const CHASE_SCENE: PackedScene = preload("res://addons/ngdc_pathfinding/chase_ai
 const TIME_SCALE: float = 3.0
 
 var _failures: int = 0
+## 腳本錯誤也算失敗（會讓測試函式中斷、跑不到 _expect）
+var _script_errors: ScriptErrors = ScriptErrors.new()
 var _level: Node2D
 var _player: Node2D
 
@@ -35,6 +38,7 @@ func _ready() -> void:
 	await _test_no_pathfinding()
 	Engine.time_scale = 1.0
 
+	_failures += _script_errors.report()
 	if _failures == 0:
 		print("[追逐 AI 測試] 全部 PASS")
 		get_tree().quit(0)

@@ -174,26 +174,41 @@ func _build_chase() -> Node2D:
 
 func _build_tower_defense() -> Node2D:
 	_new_root("TowerDefense")
-	var layers: Array[TileMapLayer] = _paint(TD_MAP)
+	var map: TDMap = _td_map("default", [Vector2i(1, 8)], [Vector2i(34, 8)])
+	_td_map("two_gates", [Vector2i(1, 3), Vector2i(1, 13)], [Vector2i(34, 3), Vector2i(34, 13)])
+	_fixed_route_map()
+	# 地板、尋路地圖：MapLoader 遊戲開始時會照地圖大小重鋪地板、重建尋路地圖；這裡先鋪預設地圖的大小
+	var tileset: TileSet = load(TILESET)
+	var floor_layer: TileMapLayer = _add(TileMapLayer.new(), "Floor", _root)
+	floor_layer.tile_set = tileset
+	for y: int in map.size.y:
+		for x: int in map.size.x:
+			floor_layer.set_cell(Vector2i(x, y), 0, Vector2i(0, 0))
+	var walls: TileMapLayer = _add(TileMapLayer.new(), "Walls", _root)
+	walls.tile_set = tileset
+	_add_grid([floor_layer, walls], 1)
 	var counts: Dictionary[String, int] = {}
-	var spawner_at: Vector2
-	var base_at: Vector2
-	for y: int in TD_MAP.size():
-		for x: int in TD_MAP[y].length():
-			match TD_MAP[y][x]:
-				"S": spawner_at = _at(Vector2i(x, y))
-				"H": base_at = _at(Vector2i(x, y))
-	_add_grid(layers, 1)
-	var base: Node2D = _instance("res://examples/tower_defense/features/base/base.tscn", "Base", base_at, counts)
-	var spawner: Spawner = _instance("res://addons/ngdc_pathfinding/spawner/spawner.tscn", "Spawner", spawner_at, counts)
-	spawner.target = base
-	spawner.lose_when_reached = false                             # 基地有血量，扣光才輸
+	var spawner: Spawner = _instance("res://addons/ngdc_pathfinding/spawner/spawner.tscn", "Spawner", map.cell_center(map.spawn_cells[0]), counts)
+	spawner.lose_when_reached = false                             # 基地有血量，扣光才輸（看 BaseGroup）
 	spawner.start_delay = 5.0
 	spawner.time_between_waves = 6.0
-	spawner.waves = [_wave(5, 1.2, 50, 3), _wave(8, 0.9, 60, 5), _wave(12, 0.7, 70, 8)]
-	var builder: Node2D = _instance("res://examples/tower_defense/features/builder/builder.tscn", "Builder", Vector2.ZERO, counts)
-	builder.set("spawner", spawner)
-	builder.set("base", base)
+	const ENEMIES: String = "res://examples/tower_defense/features/enemies/"
+	spawner.waves = [
+		_wave(6, 1.2, 50, 3),
+		_wave(6, 0.9, 0, 3, ENEMIES + "fast_walker.tscn"),
+		_wave(5, 1.4, 45, 6, ENEMIES + "splitter.tscn"),
+		_wave(6, 1.0, 45, 4, ENEMIES + "flyer.tscn"),
+		_wave(4, 2.0, 40, 6, ENEMIES + "tank_walker.tscn"),
+		_wave(4, 1.5, 45, 8, ENEMIES + "healer_walker.tscn"),
+	]
+	var camera: PanCamera = _instance("res://core/camera/pan_camera.tscn", "PanCamera", Vector2(576, 312), counts)
+	var loader: MapLoader = _instance("res://examples/tower_defense/features/map/map_loader.tscn", "MapLoader", Vector2.ZERO, counts)
+	loader.map = map
+	loader.spawners = [spawner]
+	loader.floor_layer = floor_layer
+	loader.camera = camera
+	_instance("res://examples/tower_defense/features/base/base_group.tscn", "BaseGroup", Vector2.ZERO, counts)
+	_instance("res://examples/tower_defense/features/builder/builder.tscn", "Builder", Vector2.ZERO, counts)
 
 	var hud: CanvasLayer = _add(CanvasLayer.new(), "HUD", _root)
 	hud.layer = 20                                                # 在黑暗（10）、視野錐（11）、除錯（12）上面，暫停（30）下面
@@ -203,14 +218,68 @@ func _build_tower_defense() -> Node2D:
 	money.set("prefix", "金錢 ")
 	money.set("score", 12)
 	var wave_label: Node = _instance_ui("res://examples/tower_defense/features/hud/wave_label.tscn", "WaveLabel", box)
-	_hint(box, "1 牆（1 元）　2 塔（4 元）　左鍵蓋、右鍵拆　打死怪加錢")
-	spawner.reached_goal.connect(Callable(base, "take_hit"), CONNECT_PERSIST)
+	_instance_ui("res://examples/tower_defense/features/hud/base_label.tscn", "BaseLabel", box)
+	_hint(box, "左鍵蓋、右鍵拆（退一半）　WASD／滑鼠到邊緣移動、滾輪縮放　滑鼠移到塔上看射程")
+	var bar: Control = _instance_ui("res://examples/tower_defense/features/hud/build_bar.tscn", "BuildBar", hud)
+	bar.position = Vector2(64, 616)
+	var speed_button: Control = _instance_ui("res://examples/tower_defense/features/hud/speed_button.tscn", "SpeedButton", hud)
+	speed_button.position = Vector2(1076, 22)                    # 起手包的「選單」按鈕左邊
 	spawner.wave_started.connect(Callable(wave_label, "show_wave"), CONNECT_PERSIST)
 	return _root
 
 
-func _wave(count: int, interval: float, speed: float, health: float) -> Wave:
+## 固定路線型的範例地圖：到處都是高地，中間挖一條彎彎的路；塔只能蓋在高地、不能蓋牆
+func _fixed_route_map() -> void:
+	const PATH: String = "res://examples/tower_defense/maps/fixed_route.tres"
+	if ResourceLoader.exists(PATH):
+		return
+	var map: TDMap = TDMap.new()
+	map.map_name = "fixed_route"
+	map.ensure()
+	map.paint_rect(TDMap.Kind.HIGH, Rect2(Vector2.ZERO, Vector2(map.size * TDMap.CELL)))
+	var road: Array[Vector2i] = [Vector2i(1, 3), Vector2i(10, 3), Vector2i(10, 13), Vector2i(24, 13), Vector2i(24, 3), Vector2i(34, 3)]
+	for i: int in road.size() - 1:
+		var a: Vector2 = map.cell_center(road[i])
+		var b: Vector2 = map.cell_center(road[i + 1])
+		map.paint_rect(TDMap.Kind.HIGH, Rect2(a.min(b), (b - a).abs()).grow(30.0), true)   # 路：寬兩格
+	map.spawn_cells = [road[0]]
+	map.base_cells = [road[road.size() - 1]]
+	map.tower_ground = 1 << TDMap.Ground.HIGH
+	map.wall_ground = 0
+	ResourceSaver.save(map, PATH)
+	print("存檔 %s：OK" % PATH)
+
+
+## 範例地圖：maps/名稱.tres。還沒有的話照 TD_MAP 畫一張（# 岩石、~ 沼澤；外框不算），出怪口、基地放在指定的格子
+func _td_map(map_name: String, spawns: Array[Vector2i], bases: Array[Vector2i]) -> TDMap:
+	var path: String = "res://examples/tower_defense/maps/%s.tres" % map_name
+	if ResourceLoader.exists(path):
+		return load(path)
+	var map: TDMap = TDMap.new()
+	map.map_name = map_name
+	map.size = Vector2i(TD_MAP[0].length(), TD_MAP.size())
+	map.ensure()
+	for y: int in TD_MAP.size():
+		for x: int in TD_MAP[y].length():
+			var border: bool = x == 0 or y == 0 or x == map.size.x - 1 or y == map.size.y - 1
+			var cell: Vector2i = Vector2i(x, y)
+			match TD_MAP[y][x]:
+				"#":
+					if not border:
+						map.paint(TDMap.Kind.ROCK, map.cell_center(cell), 22.0)
+				"~": map.paint(TDMap.Kind.SWAMP, map.cell_center(cell), 26.0)
+	map.spawn_cells = spawns
+	map.base_cells = bases
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(path.get_base_dir()))
+	ResourceSaver.save(map, path)
+	print("存檔 %s：OK" % path)
+	return load(path)
+
+
+func _wave(count: int, interval: float, speed: float, health: float, enemy: String = "") -> Wave:
 	var wave: Wave = Wave.new()
+	if not enemy.is_empty():
+		wave.enemy_scene = load(enemy)
 	wave.count = count
 	wave.interval = interval
 	wave.speed = speed

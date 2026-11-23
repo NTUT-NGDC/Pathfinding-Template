@@ -10,6 +10,7 @@ extends Node
 ## 在命令列執行：
 ##   godot --headless --path . res://addons/ngdc_pathfinding/tests/pathfinding_test.tscn
 
+const ScriptErrors = preload("res://core/tests/scripts/script_error_counter.gd")
 const TILESET: TileSet = preload("res://addons/ngdc_pathfinding/grid/tileset/tileset.tres")
 const TestDoor: GDScript = preload("res://addons/ngdc_pathfinding/tests/scripts/test_door.gd")
 const WALKER_SCENE: PackedScene = preload("res://addons/ngdc_pathfinding/spawner/walker.tscn")
@@ -21,6 +22,8 @@ const SWAMP: Vector2i = Vector2i(5, 0)
 const TIME_SCALE: float = 3.0
 
 var _failures: int = 0
+## 腳本錯誤也算失敗（會讓測試函式中斷、跑不到 _expect）
+var _script_errors: ScriptErrors = ScriptErrors.new()
 var _level: Node2D
 var _grid: PathGrid
 var _walls: TileMapLayer
@@ -37,6 +40,7 @@ func _ready() -> void:
 	await _test_spawner()
 	await _test_click_mover()
 	Engine.time_scale = 1.0
+	_failures += _script_errors.report()
 	if _failures == 0:
 		print("[尋路積木測試] 全部 PASS")
 		get_tree().quit(0)
