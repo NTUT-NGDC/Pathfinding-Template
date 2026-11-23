@@ -153,6 +153,7 @@ func _build_chase() -> Node2D:
 	camera.use_limits = true
 	camera.limit_size = Vector2(1280, 720)
 	var hud: CanvasLayer = _add(CanvasLayer.new(), "HUD", _root)
+	hud.layer = 20                                                # 在黑暗（10）、視野錐（11）、除錯（12）上面，暫停（30）下面
 	var box: VBoxContainer = _add(VBoxContainer.new(), "Info", hud)
 	box.position = Vector2(22, 12)
 	_instance_ui("res://examples/chase/features/exit/objective_counter.tscn", "ObjectiveCounter", box)
@@ -186,6 +187,7 @@ func _build_tower_defense() -> Node2D:
 	builder.set("base", base)
 
 	var hud: CanvasLayer = _add(CanvasLayer.new(), "HUD", _root)
+	hud.layer = 20                                                # 在黑暗（10）、視野錐（11）、除錯（12）上面，暫停（30）下面
 	var box: VBoxContainer = _add(VBoxContainer.new(), "Info", hud)
 	box.position = Vector2(22, 12)
 	var money: Node = _instance_ui("res://core/hud/score_display.tscn", "Money", box)
@@ -224,6 +226,7 @@ func _build_tactics() -> Node2D:
 				unit.set("move_points", 4 if c == "A" else 3)
 	var move_range: Node2D = _instance("res://addons/ngdc_pathfinding/move_range/move_range.tscn", "MoveRange", Vector2.ZERO, counts)
 	var hud: CanvasLayer = _add(CanvasLayer.new(), "HUD", _root)
+	hud.layer = 20                                                # 在黑暗（10）、視野錐（11）、除錯（12）上面，暫停（30）下面
 	var box: VBoxContainer = _add(VBoxContainer.new(), "Info", hud)
 	box.position = Vector2(22, 12)
 	var turn_label: Label = _add(Label.new(), "TurnLabel", box)

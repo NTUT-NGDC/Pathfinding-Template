@@ -67,6 +67,7 @@ move_points = 3
 script = ExtResource("7_j2jif")
 
 [node name="HUD" type="CanvasLayer" parent="." unique_id=2052185101]
+layer = 20
 
 [node name="Info" type="VBoxContainer" parent="HUD" unique_id=1193810804]
 offset_left = 22.0

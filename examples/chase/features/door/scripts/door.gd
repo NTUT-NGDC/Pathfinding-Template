@@ -26,6 +26,8 @@ const CLOSED_LAYERS: int = 1 | 2
 const CLOSED_COST: float = 4.0
 const DOOR_COLOR: Color = Color("8a6340")
 const DOOR_DARK: Color = Color("5a3f28")
+## 玩家在門口關門時，被推到門外多遠（門半格 16＋玩家半徑 10＋1）
+const STEP_OUT_DISTANCE: float = 27.0
 
 @export_group("門")
 ## 門板的方向：牆是橫的就選「橫」，牆是直的就選「直」
@@ -78,12 +80,18 @@ func _ready() -> void:
 
 
 ## 玩家按 E：上鎖的話有鑰匙就解鎖並打開；沒鎖就開關門
+## 玩家自己站在門口關門：先把玩家推到比較近的那一側再關（門口還有別人就關不起來）
 func _on_interacted(player: Player) -> void:
 	if locked and player.has_key(key_color):
 		unlock(key_color)
 		open()
 	elif not locked:
-		toggle()
+		var bodies: Array[Node2D] = _doorway.get_overlapping_bodies()
+		if is_open and bodies.size() == 1 and bodies[0] == player:
+			_step_out(player)
+			_close_now()
+		else:
+			toggle()
 
 
 ## 開門（上鎖的打不開）。回傳有沒有開成功
@@ -100,10 +108,23 @@ func open() -> bool:
 func close() -> bool:
 	if not is_open or is_blocked():
 		return false
+	_close_now()
+	return true
+
+
+func _close_now() -> void:
 	_set_open(false)
 	_make_sound()
 	obstacle_changed.emit()
-	return true
+
+
+## 把站在門口的玩家推到門外：橫的門推到上或下，直的門推到左或右（看玩家比較靠哪邊，剛好在正中間就看面向）
+func _step_out(player: Player) -> void:
+	var axis: Vector2 = Vector2.DOWN if orientation == 0 else Vector2.RIGHT
+	var side: float = signf((player.global_position - global_position).dot(axis))
+	if side == 0.0:
+		side = 1.0 if player.facing.dot(axis) >= 0.0 else -1.0
+	player.global_position = global_position + axis * side * STEP_OUT_DISTANCE
 
 
 ## 開著就關、關著就開

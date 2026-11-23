@@ -1,6 +1,7 @@
 extends Node
 ## 三個範例的自動測試：
 ## 1. 追逐：寶物 3 個＋發電機、都完成出口才打開、走進出口就贏；開門條件（全部／指定／數量／一開始就開）；
+##    守衛被聲音引開後會走回崗位；站在門口按 E 會退出去把門關上；
 ##    發電機會發出聲音；鏡頭固定在畫面中間；被追逐 AI 碰到就輸；上鎖的門要鑰匙
 ## 2. 塔防：蓋牆扣錢、不能把路堵死、錢不夠蓋不了、塔會打怪、怪走到基地扣血
 ## 3. 戰棋：點棋子亮出移動範圍、走過去、走到敵人旁邊會攻擊、敵方回合往我方靠近
@@ -82,6 +83,8 @@ func _test_chase() -> void:
 	_expect(GameFlow.is_finished() and _result_title().contains("勝利"), "走進出口：勝利畫面")
 
 	await _test_open_conditions()
+	await _test_guard_returns()
+	await _test_close_door_in_doorway()
 
 	await _load(CHASE)
 	player = get_tree().get_first_node_in_group("player")
@@ -133,6 +136,50 @@ func _test_open_conditions() -> void:
 	exit.call("_collect")
 	await _frames(2)
 	_expect(exit.is_open, "一開始就開")
+
+
+## 玩家站在門那格按 E：門關上，玩家被推到比較近的那一側
+func _test_close_door_in_doorway() -> void:
+	await _load(CHASE)
+	_freeze_group("chase_ai")
+	var player: Player = get_tree().get_first_node_in_group("player")
+	var door: Door = null
+	for node: Node in get_tree().get_nodes_in_group("path_obstacles"):
+		if node is Door and not (node as Door).locked:
+			door = node
+			break
+	door.open()
+	var axis: Vector2 = Vector2.DOWN if door.orientation == 0 else Vector2.RIGHT
+	player.global_position = door.global_position - axis * 4.0      # 站在門那格，稍微偏上（左）
+	await _frames(3)
+	_expect(door.is_blocked(), "門口：偵測得到玩家")
+	door.call("_on_interacted", player)
+	var offset: Vector2 = player.global_position - door.global_position
+	_expect(not door.is_open and offset.is_equal_approx(-axis * Door.STEP_OUT_DISTANCE), "站在門口按 E：門關上、玩家退到比較近的那一側（%s）" % offset)
+	await _frames(3)
+	_expect(not door.is_blocked() and player.global_position.distance_to(door.global_position + offset) < 1.0, "退出去之後沒有卡在門裡")
+
+
+## 守衛（沒有巡邏點）被聲音引開，查看完會走回崗位
+func _test_guard_returns() -> void:
+	await _load(CHASE)
+	_level.get_node("ChaseAI").process_mode = Node.PROCESS_MODE_DISABLED
+	var guard: ChaseAI = _level.get_node("Guard")
+	var grid: PathGrid = get_tree().get_first_node_in_group("path_grid")
+	var home: Vector2 = guard.global_position
+	var sound_at: Vector2 = Vector2.INF
+	for offset: Vector2 in [Vector2(-96, 0), Vector2(0, 96), Vector2(96, 0), Vector2(0, -96)]:
+		if grid.is_cell_walkable(grid.cell_of(home + offset)):
+			sound_at = home + offset
+			break
+	_expect(sound_at != Vector2.INF, "守衛旁邊找得到走得到的地方")
+	if sound_at == Vector2.INF:
+		return
+	guard.call("_on_heard", sound_at)
+	await _wait_until(func() -> bool: return guard.global_position.distance_to(sound_at) < 20.0, 400)
+	_expect(guard.state == ChaseAI.State.INVESTIGATE and guard.global_position.distance_to(home) > 60.0, "守衛：聽到聲音走過去查看")
+	await _wait_until(func() -> bool: return guard.state == ChaseAI.State.PATROL and guard.global_position.distance_to(home) < 20.0, 600)
+	_expect(guard.global_position.distance_to(home) < 20.0, "守衛：查看完走回崗位（離崗位 %.0f px）" % guard.global_position.distance_to(home))
 
 
 # ---- 塔防 ----

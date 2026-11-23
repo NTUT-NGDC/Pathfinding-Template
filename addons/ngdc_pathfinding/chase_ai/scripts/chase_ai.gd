@@ -6,7 +6,7 @@ extends CharacterBody2D
 ##
 ## 用法：
 ##   1. 把 chase_ai.tscn 拖進場景（放幾隻都可以，場景裡要有尋路地圖 PathGrid）
-##   2. 在它底下加幾個 Marker2D 當巡邏點，拖到你要它走的地方（沒有巡邏點就站著左右張望）
+##   2. 在它底下加幾個 Marker2D 當巡邏點，拖到你要它走的地方（沒有巡邏點就是守衛：站在原地左右張望，被引開之後會走回來）
 ##   3. 調這個節點檢查器的「個性」「開關」（底下的 VisionSensor、Ear、PathFollower 不用調，會被這裡蓋過去）
 ##
 ## 看、聽、走路分別交給底下的 VisionSensor、Ear、PathFollower，這個腳本只負責「決定要做什麼」。
@@ -28,6 +28,8 @@ const STATE_NAMES: Array[String] = ["巡邏", "查看", "懷疑", "追擊", "搜
 const INVESTIGATE_LOOK_RATIO: float = 0.5
 ## 張望時左右轉多少度
 const LOOK_AROUND_ANGLE: float = 70.0
+## 離崗位多近算回到崗位（像素，大約半格）
+const HOME_DISTANCE: float = 20.0
 ## 視野錐顏色：巡邏白、查看／懷疑黃、追擊紅
 const CONE_COLORS: Array[Color] = [
 	Color(1, 1, 1, 0.16), Color(1, 0.85, 0.2, 0.22), Color(1, 0.85, 0.2, 0.22),
@@ -120,6 +122,9 @@ var _look_center: Vector2 = Vector2.RIGHT
 var _look_time: float = 0.0
 ## 親眼看到目標躲進去的地方
 var _grab_spot: Node2D
+## 崗位：沒有巡邏點時，閒下來就回到這裡、面向一開始的方向
+var _home: Vector2
+var _home_facing: Vector2
 var _has_caught: bool = false
 var _overlay: Node2D
 var _mark_label: Label
@@ -135,6 +140,8 @@ func _ready() -> void:
 	if Engine.is_editor_hint():
 		return
 	add_to_group("chase_ai")
+	_home = global_position
+	_home_facing = facing
 	for child: Node in get_children():
 		if child is Marker2D:
 			_patrol_points.append((child as Marker2D).global_position)  # 巡邏點跟著主人動，所以一開始先記下位置
@@ -209,7 +216,7 @@ func update_state(delta: float) -> void:
 
 func _patrol(delta: float) -> void:
 	if _patrol_points.is_empty():
-		_look_around(delta)                                       # 沒有巡邏點：站著左右張望
+		_guard_post(delta)                                        # 沒有巡邏點：回崗位站崗
 		return
 	if _mover.is_moving():
 		return
@@ -219,6 +226,16 @@ func _patrol(delta: float) -> void:
 	_mover.go_to(_patrol_points[_patrol_index])
 	_wait_timer = patrol_wait
 	_next_patrol_index()
+
+
+## 站崗：離崗位太遠就走回去，到了就面向原本的方向左右張望
+func _guard_post(delta: float) -> void:
+	if global_position.distance_to(_home) > HOME_DISTANCE:
+		if not _mover.is_moving():
+			_mover.go_to(_home)
+		return
+	_look_center = _home_facing
+	_look_around(delta)
 
 
 func _next_patrol_index() -> void:

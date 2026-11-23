@@ -111,6 +111,7 @@ target = NodePath("../Player")
 use_limits = true
 
 [node name="HUD" type="CanvasLayer" parent="." unique_id=729078018]
+layer = 20
 
 [node name="Info" type="VBoxContainer" parent="HUD" unique_id=5016519]
 offset_left = 22.0

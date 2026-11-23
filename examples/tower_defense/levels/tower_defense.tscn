@@ -71,6 +71,7 @@ spawner = NodePath("../Spawner")
 base = NodePath("../Base")
 
 [node name="HUD" type="CanvasLayer" parent="." unique_id=826790883]
+layer = 20
 
 [node name="Info" type="VBoxContainer" parent="HUD" unique_id=199070785]
 offset_left = 22.0
