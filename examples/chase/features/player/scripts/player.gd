@@ -28,10 +28,6 @@ signal unhid(spot: Node2D)
 ## 跑步時每隔幾秒發出一次腳步聲
 @export_range(0.1, 2.0, 0.05, "suffix:秒") var run_sound_interval: float = 0.35
 
-@export_group("鏡頭")
-## 鏡頭跟著玩家。關掉的話鏡頭固定，關卡要小到一個畫面放得下
-@export var camera_follow: bool = false
-
 ## 從開始到現在幾秒（逃出去時顯示通關時間）
 var elapsed: float = 0.0
 
@@ -62,7 +58,6 @@ var _holding: Interactable
 
 @onready var _interact_area: Area2D = $InteractArea
 @onready var _prompt: Label = $Prompt
-@onready var _camera: Camera2D = $Camera2D
 
 
 func _enter_tree() -> void:
@@ -72,7 +67,6 @@ func _enter_tree() -> void:
 func _ready() -> void:
 	collision_layer = PLAYER_LAYER
 	collision_mask = PATH_LAYER
-	_camera.enabled = camera_follow
 
 
 func _physics_process(delta: float) -> void:

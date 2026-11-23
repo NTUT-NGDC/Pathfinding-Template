@@ -3,6 +3,7 @@ extends Node
 ##   godot --headless --path . res://_dev/tools/make_examples.tscn
 ## 加上 `-- chase`／`-- tower_defense`／`-- tactics` 只產生其中一個。
 ##
+## 追逐：P 玩家　M 巡邏的追逐 AI（1～4 巡邏點）　N 守衛　T 寶物　K 紅鑰匙　L 紅色上鎖的門　D／d 門　R 任務點（發電機）　C／E 躲藏點　X 出口
 ## 共用符號：# 牆　G 玻璃　b 草叢　~ 沼澤　. 木頭地板　, 磁磚地板　空白＝房子外面
 
 const TILE: int = 32
@@ -19,7 +20,7 @@ const CHASE_MAP: PackedStringArray = [
 	"#........#,,,,,,,,,,,,,,#.....C....#",
 	"###GGG####,,,,,bbb,,,,,,###GGG######",
 	"#........#,,,,,bbb,,,,,,,,,,,,,,,,,#",
-	"#........#,,,,,,,,,,,,,,,,,,,,,,,,,#",
+	"#........#,,,,,,,,,,,,,,,,,,,,R,,,,#",
 	"#..P.....D,,1M,,,,,,,,,2,,,,,,,,,,,#",
 	"#........#,,,,,,,,,,,,,,,,,,,,,,,,,#",
 	"#...C....#,,,,,,,,,,,,,,#####L######",
@@ -121,6 +122,8 @@ func _build_chase() -> Node2D:
 					var key: Node2D = _instance("res://examples/chase/features/pickup/pickup.tscn", "Key", at, counts)
 					key.set("kind", "紅")
 					key.set("required", false)
+				"R":
+					_instance("res://examples/chase/features/task_point/task_point.tscn", "Generator", at, counts)
 				"C", "E":
 					var spot: Node2D = _instance("res://examples/chase/features/hiding_spot/hiding_spot.tscn", "HidingSpot", at, counts)
 					spot.set("style", 0 if CHASE_MAP[y][x] == "C" else 1)
@@ -144,10 +147,15 @@ func _build_chase() -> Node2D:
 	guard.body_color = Color("8a3ab0")
 
 	_instance("res://examples/chase/features/darkness/darkness.tscn", "Darkness", Vector2.ZERO, counts)
+	# 鏡頭：預設固定在畫面中間；邊界＝整個畫面（勾「跟隨」再把 Zoom 調成 2 就會跟著玩家）
+	var camera: FollowCamera = _instance("res://core/camera/follow_camera.tscn", "FollowCamera", Vector2(640, 360) - OFFSET, counts)
+	camera.follow = false
+	camera.use_limits = true
+	camera.limit_size = Vector2(1280, 720)
 	var hud: CanvasLayer = _add(CanvasLayer.new(), "HUD", _root)
 	var box: VBoxContainer = _add(VBoxContainer.new(), "Info", hud)
 	box.position = Vector2(22, 12)
-	_instance_ui("res://examples/chase/features/pickup/pickup_counter.tscn", "PickupCounter", box)
+	_instance_ui("res://examples/chase/features/exit/objective_counter.tscn", "ObjectiveCounter", box)
 	_hint(box, "WASD 移動　Shift 跑（會發出聲音）　E 互動　F1～F5 除錯")
 	return _root
 
@@ -268,7 +276,7 @@ func _paint(map: PackedStringArray) -> Array[TileMapLayer]:
 
 ## 角色、門這些符號底下鋪什麼地板：旁邊是磁磚就鋪磁磚
 func _near_tile(map: PackedStringArray, x: int, y: int) -> bool:
-	if not "123456789MNX".contains(map[y][x]):
+	if not "123456789MNXR".contains(map[y][x]):
 		return false
 	return (x > 0 and map[y][x - 1] == ",") or (x < map[y].length() - 1 and map[y][x + 1] == ",") or map[y][x] == "X"
 

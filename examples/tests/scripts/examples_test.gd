@@ -1,6 +1,7 @@
 extends Node
 ## 三個範例的自動測試：
-## 1. 追逐：寶物 3 個、撿完出口打開、走進出口就贏；被追逐 AI 碰到就輸；上鎖的門要鑰匙
+## 1. 追逐：寶物 3 個＋發電機、都完成出口才打開、走進出口就贏；開門條件（全部／指定／數量／一開始就開）；
+##    發電機會發出聲音；鏡頭固定在畫面中間；被追逐 AI 碰到就輸；上鎖的門要鑰匙
 ## 2. 塔防：蓋牆扣錢、不能把路堵死、錢不夠蓋不了、塔會打怪、怪走到基地扣血
 ## 3. 戰棋：點棋子亮出移動範圍、走過去、走到敵人旁邊會攻擊、敵方回合往我方靠近
 ##
@@ -50,8 +51,11 @@ func _test_chase() -> void:
 	_expect(treasures.size() == 3 and key != null, "3 個寶物＋1 把鑰匙")
 	_expect(get_tree().get_nodes_in_group("chase_ai").size() == 2, "2 隻追逐 AI")
 	_expect(exit != null and not exit.is_open, "一開始出口關著")
-	var counter: Label = _level.get_node("HUD/Info/PickupCounter")
-	_expect(counter.text.begins_with("寶物 0/3"), "畫面顯示「寶物 0/3」")
+	var generator: TaskPoint = _level.get_node("Generator")
+	var counter: Label = _level.get_node("HUD/Info/ObjectiveCounter")
+	_expect(counter.text == "寶物 0/3　發電機 0/1", "畫面顯示「寶物 0/3　發電機 0/1」（%s）" % counter.text)
+	var camera: FollowCamera = _level.get_node("FollowCamera")
+	_expect(camera.is_current() and camera.get_screen_center_position().is_equal_approx(Vector2(640, 360)), "鏡頭：固定在畫面中間")
 	var locked: Node2D = null
 	for door: Node in get_tree().get_nodes_in_group("path_obstacles"):
 		if door.get("locked") == true:
@@ -62,13 +66,22 @@ func _test_chase() -> void:
 	for treasure: Pickup in treasures:
 		treasure.call("_on_interacted", player)
 	await _frames(2)
-	_expect(exit.is_open and counter.text.contains("3/3"), "撿完 3 個寶物：出口打開")
+	_expect(not exit.is_open and counter.text.begins_with("寶物 3/3"), "撿完 3 個寶物：發電機還沒修，出口不開")
+	var heard: Array[float] = []
+	SoundBus.instance().sound_emitted.connect(func(_p: Vector2, radius: float) -> void: heard.append(radius))
+	generator.call("_work", player, 2.0)
+	_expect(not generator.is_done and heard.size() == 1, "修發電機：還沒修好、發出聲音")
+	generator.call("_work", player, generator.hold_time)
+	await _frames(2)
+	_expect(generator.is_done and exit.is_open and counter.text.contains("發電機 1/1"), "修好發電機：出口打開（%s）" % counter.text)
 	player.global_position = exit.global_position + Vector2(0, -24)
 	await _frames(2)
 	Input.action_press("move_down")
 	await _wait_until(func() -> bool: return GameFlow.is_finished(), 120)
 	Input.action_release("move_down")
 	_expect(GameFlow.is_finished() and _result_title().contains("勝利"), "走進出口：勝利畫面")
+
+	await _test_open_conditions()
 
 	await _load(CHASE)
 	player = get_tree().get_first_node_in_group("player")
@@ -79,6 +92,47 @@ func _test_chase() -> void:
 	killer.start_angle = 0.0
 	await _wait_until(func() -> bool: return GameFlow.is_finished(), 200)
 	_expect(GameFlow.is_finished() and _result_title().contains("失敗"), "被追逐 AI 碰到：失敗畫面")
+
+
+func _test_open_conditions() -> void:
+	await _load(CHASE)
+	_freeze_group("chase_ai")
+	var player: Player = get_tree().get_first_node_in_group("player")
+	var exit: Exit = get_tree().get_first_node_in_group("exits")
+	var generator: TaskPoint = _level.get_node("Generator")
+	var treasure: Pickup = _level.get_node("Treasure")
+	var counter: Label = _level.get_node("HUD/Info/ObjectiveCounter")
+	exit.open_when = 1                                            # 指定：只要發電機
+	exit.targets = [generator]
+	exit.call("_collect")
+	await _frames(2)
+	_expect(not exit.is_open and counter.text == "發電機 0/1", "指定：只看清單裡的發電機（%s）" % counter.text)
+	generator.hold_time = 0.0
+	generator.call("_work", player, 0.0)
+	await _frames(2)
+	_expect(exit.is_open, "指定：發電機修好就開（寶物沒撿也開）")
+
+	await _load(CHASE)
+	_freeze_group("chase_ai")
+	player = get_tree().get_first_node_in_group("player")
+	exit = get_tree().get_first_node_in_group("exits")
+	treasure = _level.get_node("Treasure")
+	counter = _level.get_node("HUD/Info/ObjectiveCounter")
+	exit.open_when = 2                                            # 數量：4 個目標裡完成 1 個
+	exit.needed = 1
+	exit.call("_collect")
+	await _frames(2)
+	_expect(not exit.is_open and counter.text == "目標 0/1", "數量：顯示「目標 0/1」（%s）" % counter.text)
+	treasure.call("_on_interacted", player)
+	await _frames(2)
+	_expect(exit.is_open, "數量：撿 1 個寶物就開")
+
+	await _load(CHASE)
+	exit = get_tree().get_first_node_in_group("exits")
+	exit.open_when = 3
+	exit.call("_collect")
+	await _frames(2)
+	_expect(exit.is_open, "一開始就開")
 
 
 # ---- 塔防 ----

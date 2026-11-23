@@ -33,10 +33,10 @@ addons/        技術積木（不要改），每週一包，例如 addons/ngdc_p
 examples/      範例遊戲，可以從這裡複製來改
 features/      每個功能一個資料夾，一個人負責
   <功能名稱>/
-    <功能名稱>.tscn   場景直接放
-    scripts/          腳本
-    data/             資料（.tres）
-    test.tscn         自己測試用
+	<功能名稱>.tscn   場景直接放
+	scripts/          腳本
+	data/             資料（.tres）
+	test.tscn         自己測試用
 levels/        主場景，指定一個人負責組裝
 shared/        大家都會用的東西（共用素材、常數），改之前先在組裡講
 docs/          遊戲概要、分工表、這份說明
@@ -81,7 +81,7 @@ game_config.tres   遊戲名稱、開始場景、Credits 名單
 
 | 範例 | 用到的積木 | 可以改成 |
 | --- | --- | --- |
-| `examples/chase/`：在房子裡拿東西逃出去，被追逐 AI 追 | 尋路地圖、追逐 AI、視野、聲音 | 潛行、恐怖逃脫、小精靈、外送 |
+| `examples/chase/`：在房子裡拿東西、修發電機逃出去，被追逐 AI 追（出口條件看「目標」接口：group `objectives`＋`required`／`is_done`／`category`＋`completed`，說明在範例 README） | 尋路地圖、追逐 AI、視野、聲音 | 潛行、恐怖逃脫、小精靈、外送 |
 | `examples/tower_defense/`：點格子放牆／塔，怪即時改路 | 尋路地圖、生怪器、跟著路徑走 | 塔防、殭屍圍城、路網規劃 |
 | `examples/tactics/`：點角色看移動範圍、點格子走過去 | 尋路地圖、移動範圍、跟著路徑走 | 戰棋、自走棋、小隊指揮、經營 |
 
