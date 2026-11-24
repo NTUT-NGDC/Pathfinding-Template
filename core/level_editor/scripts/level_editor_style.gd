@@ -1,6 +1,6 @@
-class_name TacticsEditorStyle
+class_name LevelEditorStyle
 extends RefCounted
-## 戰棋編輯器的按鈕顏色，都寫在這裡。
+## 關卡編輯器的按鈕顏色，都寫在這裡。
 
 ## 存檔
 const SAVE: Color = Color("2e8b57")

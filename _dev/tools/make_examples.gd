@@ -383,7 +383,7 @@ func _tactics_save(map: TacticsMap) -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(path.get_base_dir()))
 	print("存檔 %s：%s" % [path, error_string(ResourceSaver.save(map, path))])
 	if map.map_name != "default":                                 # default 就是 tactics.tscn 用的
-		TacticsLevelMaker.make(path)
+		LevelMaker.make("res://examples/tactics/levels/%s.tscn" % map.map_name, "res://examples/tactics/levels/tactics.tscn", {"TacticsLevel": {"map": path}})
 
 
 # ---- 共用 ----

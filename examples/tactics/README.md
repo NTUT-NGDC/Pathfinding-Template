@@ -140,6 +140,10 @@
 
 ## 給會寫程式的人：做新的特性
 
-`extends UnitTrait`（`features/unit_traits/scripts/unit_trait.gd`），覆寫需要的函式就好：`step_cost()`（走路的成本）、`modify_attack()`、`modify_taken()`、`after_attack()`、`after_hit()`、`turn_started()`……要在編輯器顯示中文，覆寫 `trait_name()`、`description()`、`labels()`。扣血、補血、推人用 `battle.hurt(誰, 多少, 為什麼)`、`battle.mend(誰, 多少, 為什麼)`、`battle.slide()`；想在日誌多寫一行用 `battle.note()`（名字用 `battle.name_of()` 會上色）。改到傷害的特性會自動寫進日誌。
+`extends UnitTrait`（`features/unit_traits/scripts/unit_trait.gd`），覆寫需要的函式就好：`step_cost()`（走路的成本）、`modify_attack()`、`modify_taken()`、`after_attack()`、`after_hit()`、`turn_started()`……要在編輯器顯示中文，覆寫 `trait_name()`、`description()`、`labels()`。扣血、補血、推人用 `battle.hurt(誰, 多少, 為什麼)`、`battle.mend(誰, 多少, 為什麼)`、`battle.slide()`；想在日誌多寫一行用 `battle.note()`（名字用 `battle.name_of()` 會上色）。改到傷害的特性會自動寫進日誌。照著現成的抄：每一支都有 `@tool`。
+
+**掛在別人身上的狀態（中毒、燃燒、暈眩）**：特性只會在自己身上作用，要影響對方就在 `after_attack()` 裡 `target.add_child()` 一個狀態節點（一般的 `Node2D`，放子資料夾，不要是 `UnitTrait`）。狀態節點自己接 `battle.turn_started`（輪到誰）算回合、用 `battle.hurt()` 扣血，接 `battle.ended` 在打完時拿掉自己。毒到倒下也沒關係，那一隻這一輪就不會動。遊戲中才加上去的特性不會生效（一開始就讀好了），所以狀態不要做成特性。
+
+`unit_traits/`、`units/` **第一層的 `.tscn` 都會被編輯器當成特性、職業**，測試場景放子資料夾（例如 `unit_traits/tests/`）。測試可以繼承 `examples/_tests/scripts/tactics_test.gd`，覆寫 `_run()`，用 `_tac_duel()` 一行擺好兩邊開打。
 
 電腦怎麼算分數在 `features/battle/scripts/battle_ai.gd` 的 `_score()`，想加新的個性改這裡。

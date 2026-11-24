@@ -8,6 +8,9 @@ extends Resource
 ## 照格子畫（paint_cells）邊緣就剛好在格子線上，兩種可以混用。
 ## 規則還是看格子：格子中心在哪種地形裡，那一格就算哪種。
 
+# 加一種地形：Kind 最後面加一個，下面到 KIND_DEFENSE 每一張表都加一項，加一個同名的 @export_storage 欄位；
+# 長相在 tactics_terrain.gd 的 COLORS、EDGES、_draw_details()；擋路、擋視線在 tactics_level.gd 的 _build_grid()；
+# 編輯器的工具在 map_editor/scripts/tactics_editor.gd 的 Tool（照順序插在 HIGH 後面）
 enum Kind { PLAIN, WALL, SWAMP, FOREST, HIGH }
 enum Win { ALL, BOSS, GOAL }
 
@@ -23,6 +26,8 @@ const LAYERS: Array[Kind] = [Kind.WALL, Kind.HIGH, Kind.FOREST, Kind.SWAMP]
 ## 存檔的欄位名字（順序跟 Kind 一樣，空地不用存）
 const LAYER_FIELDS: Array[String] = ["", "wall", "swamp", "forest", "high"]
 const KIND_NAMES: Array[String] = ["空地", "牆", "沼澤", "森林", "高地"]
+## 轉成文字時的字（MapText）
+const KIND_LETTERS: Array[String] = [".", "#", "~", "f", "^"]
 ## 走進去花多少移動力（牆不能走，會飛的不管地形）
 const KIND_COSTS: Array[float] = [1.0, 1.0, 3.0, 2.0, 2.0]
 ## 站在上面多多少防禦
@@ -137,11 +142,7 @@ func cell_center(cell: Vector2i) -> Vector2:
 
 ## 某種地形的資料
 func layer(kind: Kind) -> PackedByteArray:
-	match kind:
-		Kind.WALL: return wall
-		Kind.SWAMP: return swamp
-		Kind.FOREST: return forest
-	return high
+	return get(LAYER_FIELDS[kind])
 
 
 func _set_layer(kind: Kind, data: PackedByteArray) -> void:
@@ -278,7 +279,10 @@ func _apply(kind: Kind, bounds: Rect2, depth: Callable) -> void:
 
 
 func _copy_layers() -> Array[PackedByteArray]:
-	return [wall.duplicate(), high.duplicate(), forest.duplicate(), swamp.duplicate()]   # 順序跟 LAYERS 一樣
+	var result: Array[PackedByteArray] = []
+	for kind: Kind in LAYERS:
+		result.append(layer(kind).duplicate())
+	return result
 
 
 func _put_layers(data: Array[PackedByteArray]) -> void:
@@ -351,13 +355,16 @@ func problem() -> String:
 
 ## 現在的樣子（編輯器的上一步、有沒有改過都看這個）
 func snapshot() -> Dictionary:
-	return {
-		"size": size, "wall": wall.duplicate(), "swamp": swamp.duplicate(), "forest": forest.duplicate(), "high": high.duplicate(),
+	var state: Dictionary = {
+		"size": size,
 		"start": start_cell, "goals": goal_cells.duplicate(),
 		"supply_cells": supply_cells.duplicate(), "chests": chests.duplicate(), "allies": allies.duplicate(), "squads": squads.map(func(s: TacticsSquad) -> Dictionary: return s.to_data()),
 		"party": party.duplicate(), "rewards": rewards.duplicate(), "choose_party": choose_party, "party_max": party_max, "party_size": party_size, "formation": formation, "allow_split": allow_split, "start_split": start_split, "join_range": join_range, "win": win, "auto": auto_battle, "dice": dice,
 		"supplies": supplies, "camp_heal": camp_heal, "revive": revive,
 	}
+	for kind: Kind in LAYERS:
+		state[LAYER_FIELDS[kind]] = layer(kind).duplicate()
+	return state
 
 
 func restore(data: Dictionary) -> void:
@@ -391,3 +398,24 @@ func copy() -> TacticsMap:
 	other.map_name = map_name
 	other.restore(snapshot())
 	return other
+
+
+# ---- 轉成文字（core/level_editor 的 MapText；小隊、規則不在裡面） ----
+
+func text_letters() -> Dictionary:
+	var result: Dictionary = {}
+	for kind: int in KIND_LETTERS.size():
+		result[KIND_LETTERS[kind]] = kind
+	return result
+
+
+func text_kind(cell: Vector2i) -> int:
+	return kind_at(cell)
+
+
+func set_text_kind(cell: Vector2i, kind: int) -> void:
+	paint_cells(kind as Kind, Rect2i(cell, Vector2i.ONE))
+
+
+func text_fields() -> Array[String]:
+	return ["start_cell", "goal_cells", "supply_cells"]

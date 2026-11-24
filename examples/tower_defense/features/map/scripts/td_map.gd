@@ -312,3 +312,28 @@ func _set_value(kind: Kind, index: int, v: int) -> void:
 		Kind.ROCK: rock[index] = v
 		Kind.SWAMP: swamp[index] = v
 		Kind.HIGH: high[index] = v
+
+
+# ---- 轉成文字（core/level_editor 的 MapText） ----
+
+func text_letters() -> Dictionary:
+	return {".": Ground.FLOOR, "~": Ground.SWAMP, "^": Ground.HIGH, "#": Ground.ROCK}
+
+
+func text_kind(cell: Vector2i) -> int:
+	return ground(cell)
+
+
+func set_text_kind(cell: Vector2i, which: int) -> void:
+	var rect: Rect2 = Rect2(cell * CELL, Vector2(CELL, CELL))
+	match which:
+		Ground.SWAMP: paint_rect(Kind.SWAMP, rect)
+		Ground.HIGH: paint_rect(Kind.HIGH, rect)
+		Ground.ROCK: paint_rect(Kind.ROCK, rect)
+		_:
+			for kind: Kind in PRIORITY:
+				paint_rect(kind, rect, true)
+
+
+func text_fields() -> Array[String]:
+	return ["spawn_cells", "base_cells"]

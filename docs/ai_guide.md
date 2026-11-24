@@ -15,7 +15,7 @@
 
 這是多人協作的專案，**一次改一堆檔案最容易造成衝突**。
 
-1. 先看 `docs/game_overview.md` 的**分工表**，找到現在這個人負責的功能和資料夾
+1. 先看 `docs/game_overview.md` 的**分工表**，找到現在這個人負責的功能和資料夾（還沒填的話，先請使用者說他負責哪裡，幫他填好再開始）
 2. **只修改分工表上屬於這個人的資料夾**（通常是 `features/<功能名稱>/`）
 3. 要動下面這些，**先停下來問使用者**，不要直接改：
    - 別人的資料夾
@@ -60,6 +60,7 @@ game_config.tres   遊戲名稱、關卡（Levels）、Credits 名單
 | 計時 | `timer_display.tscn`，正數或倒數，倒數到 0 發 `time_up`（可設定時間到就輸／贏） | `core/hud/` |
 | 血條 | `health_bar.tscn`，`damage(10)`、`heal(10)`，到 0 發 `died`（可設定死掉就輸） | `core/hud/` |
 | 鏡頭 | `follow_camera.tscn` 拖進關卡：跟隨玩家（group `player`）或固定位置；可設長方形邊界（大小、偏移），編輯器裡會畫框。**不要在角色身上另外放 Camera2D**。策略、塔防用 `pan_camera.tscn`：WASD／方向鍵、滑鼠到邊緣、中鍵拖曳移動，滾輪縮放（可設要按 Ctrl），可設邊界（`set_limit_rect()`） | `core/camera/` |
+| 關卡編輯器的底 | 要讓人「在遊戲裡畫關卡、放東西」就 `extends LevelEditor`：分頁、畫筆、上一步、存讀檔、試玩、做成關卡都有了，只寫自己的工具。從 `core/level_editor/sample/` 抄，步驟看 [README](../core/level_editor/README.md)。自動表單 `LevelEditorForm`、怪物／棋子這種場景頁 `LevelEditorScenePage` 也在裡面，**不要自己重寫編輯器** | `core/level_editor/` |
 | 遊戲設定 | `GameConfig.current().game_name`、`.level_paths()`、`.credits` | `game_config.tres` |
 
 ### 技術積木：尋路（`addons/ngdc_pathfinding/`，說明在 [它的 README](../addons/ngdc_pathfinding/README.md)）
@@ -82,9 +83,28 @@ game_config.tres   遊戲名稱、關卡（Levels）、Credits 名單
 
 | 範例 | 用到的積木 | 可以改成 |
 | --- | --- | --- |
-| `examples/chase/`：在房子裡拿東西、修發電機逃出去，被追逐 AI 追；有捕獸夾（AI 追丟會放）、警報、可以丟的瓶子（出口條件看「目標」接口：group `objectives`＋`required`／`is_done`／`category`＋`completed`，說明在範例 README） | 尋路地圖、追逐 AI、視野、聲音 | 潛行、恐怖逃脫、小精靈、外送 |
-| `examples/tower_defense/`：點格子放牆／塔，怪即時改路；牆可以被怪打破（`TDWall`：Breakable、Max Health、Break Cost，A* 比較要繞路還是拆）；左鍵點塔升級（塔的檢查器「升級」）；地圖、波次、怪物都用編輯器做（`map_editor/`：地圖存 `maps/`、波次存 `waves/`（`WaveTable`）、怪物存 `features/enemies/`；出怪口、基地可以好幾個，基地規則看 `BaseGroup`；地形有岩石、沼澤、高地，地圖裡勾哪種地面可以蓋塔、蓋牆（`TDMap.tower_ground`、`wall_ground`：迷宮型蓋空地、固定路線型只蓋高地）；試玩在編輯器裡直接玩）；怪物掛件（`enemy_traits/`：加速、厚血、裝甲、會飛、分裂、治療）、砲塔掛件（`tower_traits/`：緩速、範圍、多重射擊）拖到怪或塔底下就生效 | 尋路地圖、生怪器、跟著路徑走 | 塔防、殭屍圍城、路網規劃 |
-| `examples/tactics/`：探索（`TacticsParty` WASD 或左鍵 `walk_to()` 帶隊，`control()` 換人、`set_split()` 整隊／分開、`TacticsFormation` 陣形、出發前 `TacticsPartySetup` 編隊、隊伍池 `TacticsPool`（起始隊伍 `party_pool.tres`＋招募 `TacticsAlly`＋過關獎勵，玩家有誰用 `TacticsPool.units()`）、`EnemySquad` 隊形巡邏＋每隻視野、偷襲、營地物資紮營、寶箱 `TacticsChest`、小隊掉落）→ 布陣 → 戰鬥（`TacticsBattle`：照速度輪流，`auto` 自動／回合制隨時切換、倍速、暫停；電腦是 `BattleAI`；`set_focus()` 指定目標、`intents` 每隻打算做什麼、`note()` 日誌、`dice` 骰子）；棋子 `Unit`＋特性 `UnitTrait`（`unit_traits/` 拖到棋子底下：飛行、沼澤行者、攔截、突擊、反擊、治療、範圍、擊退、守護、吸血），做好的職業在 `units/`；地圖（`TacticsMap`：地形用 `paint*()` 畫圓滑的或對齊格子，`kind_at()` 看格子中心；小隊、隊伍、規則）用 `map_editor/` 做，存 `maps/`。做純戰棋：小隊勾「一開始就開打」 | 尋路地圖、移動範圍、跟著路徑走、視野 | 戰棋、自走棋、潛行、小隊指揮 |
+| `examples/chase/`：在房子裡拿東西、修發電機逃出去，兩隻追逐 AI 會看、會聽；有門、躲藏點、捕獸夾、警報、瓶子（[README](../examples/chase/README.md)） | 尋路地圖、追逐 AI、視野、聲音 | 潛行、恐怖逃脫、小精靈、外送 |
+| `examples/tower_defense/`：蓋牆和塔排出迷宮，怪即時改路、繞太遠就拆牆；塔可以升級；怪物、砲塔都用掛件組；地圖、波次、怪物用編輯器做（[README](../examples/tower_defense/README.md)） | 尋路地圖、生怪器、跟著路徑走 | 塔防、殭屍圍城、路網規劃 |
+| `examples/tactics/`：帶隊探索（小隊巡邏、視野、偷襲、紮營、招募）→ 布陣 → 照速度輪流打（自動／回合制）；棋子用特性組；地圖、小隊、棋子、規則、隊伍用編輯器做（[README](../examples/tactics/README.md)） | 尋路地圖、移動範圍、跟著路徑走、視野 | 戰棋、自走棋、潛行、小隊指揮 |
+
+**從範例改之前，先讀那個範例的 README**，再看下面這張表找檔案（路徑都從那個範例的資料夾開始）：
+
+| 想改 | 看哪裡 |
+| --- | --- |
+| 追逐：新的目標、新的互動物件 | 照 `features/task_point/`（「目標」接口寫在 README 最下面），放在自己的資料夾 `features/名字/名字.tscn`；按 E 的東西掛 `features/interact/scripts/interactable.gd` |
+| 追逐：關卡 | 用編輯器（`map_editor/`）或直接改 `levels/*.tscn`，兩邊可以輪流。自己的物件放 `features/名字/名字.tscn`，編輯器的「其他」會列出來 |
+| 塔防：新的怪物掛件、砲塔掛件 | 照 `features/enemy_traits/`、`features/tower_traits/` 裡現成的，一個掛件＝一個場景＋一支腳本，編輯器會自動列出來 |
+| 塔防：蓋東西、升級的規則 | `features/builder/scripts/builder.gd`、`features/tower/scripts/` |
+| 戰棋：新的特性 | 照 `features/unit_traits/`，繼承 `UnitTrait`，覆寫需要的函式（`modify_attack()`、`turn_started()`、`after_attack()`……），編輯器會自動列出來。中毒、燃燒這種掛在對方身上的狀態看戰棋 README 最下面 |
+| 戰棋：新的職業 | 複製 `features/units/` 裡的一個場景，改數值、掛特性 |
+| 戰棋：電腦怎麼決定 | `features/battle/scripts/battle_ai.gd` |
+| 戰棋：輪流、扣血、勝負 | `features/battle/scripts/tactics_battle.gd`（很長，先搜尋函式名稱）；動畫在 `battle_effects.gd`、箭頭和記號在 `battle_marks.gd` |
+| 戰棋：新的地形 | `features/map/scripts/tactics_map.gd` 最上面的註解寫了要改哪幾個地方 |
+| 編輯器多一個欄位 | 戰棋小隊、規則：資料的腳本加 `@export`，再加到那一頁最上面的 `NUMBERS`。怪物、棋子：加到 `enemy_page.gd`／`unit_page.gd` 的 `fields` 和 `enemy_info.gd`／`unit_info.gd` 的欄位清單。追逐的物件、掛件、特性的欄位自動讀 `@export`，不用加 |
+
+怪物、掛件、職業、特性的資料夾（`enemies/`、`enemy_traits/`、`tower_traits/`、`units/`、`unit_traits/`）**第一層的 `.tscn` 都會被編輯器列出來**，測試場景放子資料夾。
+
+**塔防、戰棋的地圖（`maps/*.tres`）不要用文字編輯，也不要整份讀**：地形存成編碼過的資料，一張幾十 KB。要看、要改地形先轉成文字：`godot --headless --path . res://core/level_editor/map_text.tscn -- export res://examples/tactics/maps/default.tres 檔案.txt`，改完把 `export` 換成 `import` 寫回去（圓滑的邊緣、小隊、規則都會留著；新地圖用 `new`，看 [關卡編輯器的 README](../core/level_editor/README.md)）。想畫得漂亮請使用者開 `map_editor/`。一張地圖同一時間只有一個人改，衝突時選一邊，不能合併。
 
 ### 已經設定好的按鍵（`project.godot`，不用再加）
 
@@ -121,6 +141,23 @@ game_config.tres   遊戲名稱、關卡（Levels）、Credits 名單
 - 要讓人改的資料用 `.tres`（不要用 `.json`／`.txt`，Web 匯出不會帶上）
 - `.uid` 檔要 commit（Godot 4.4 之後腳本旁邊都有），`.godot/` 不要
 - **改檔案前先關 Godot**：Godot 編輯器開著的時候改了磁碟上的檔案，Godot 會跳出「要不要重新載入」，使用者按錯就會用舊版蓋掉你的修改。所以改任何檔案（`.gd`／`.tscn`／`.tres`／`project.godot`）前，Godot 開著的話先正常關閉（不要強制結束，有沒存的修改 Godot 會先問），改完再用編輯器打開專案；你沒辦法自己關、開 Godot 的話，請使用者先關掉，改完再開。GDScript 不用編譯，重開很快
+
+## 改完怎麼驗證
+
+改完**一定要跑過**再說做好了。`godot` 換成這台電腦上 Godot 4.7.2 的執行檔路徑；`--headless` 不會開視窗，`--fixed-fps 60` 讓它不等時間、跑得快：
+
+1. 新增了檔案或 `class_name`：先讓 Godot 認得（也會產生 `.uid`；第一次跑會有幾行字型的 `ERROR`，再跑一次就沒有）
+   `godot --headless --path . --import`
+2. 跑你改的場景約 5 秒，**看輸出有沒有 `ERROR`、`WARNING`**（有錯誤 exit code 也會是 0，一定要看文字）
+   `godot --headless --fixed-fps 60 --path . res://features/<功能名稱>/test.tscn --quit-after 300`
+3. 改了範例：跑那個範例的測試，每份幾秒，全部過會印「全部 PASS」，失敗時 exit code 是 1
+   `godot --headless --fixed-fps 60 --path . res://examples/_tests/chase_test.tscn`（還有 `tower_defense_test`、`tactics_test`）
+   測試檢查的是範例**原本**的規則。你故意改了規則（例如起始金錢）而失敗是正常的，告訴使用者是哪幾項；其他的失敗要修
+
+- 不要用 `--check-only` 檢查腳本，它不會載入 Autoload，會報假的錯誤
+- 一次只跑一個 Godot，不要同時開好幾個
+- headless 看不到畫面：跟畫面、手感有關的，請使用者按 F6 試玩
+
 
 ## 給使用者的建議
 

@@ -73,7 +73,7 @@ func is_dirty() -> bool:
 
 
 func update_save_button() -> void:
-	TDEditorStyle.paint_save(_save_button, is_dirty())
+	LevelEditorStyle.paint_save(_save_button, is_dirty())
 
 
 # ---- 改波次 ----
@@ -327,7 +327,7 @@ func _build_ui() -> void:
 	_name_edit.custom_minimum_size = Vector2(150, 0)
 	top.add_child(_name_edit)
 	_save_button = _button(top, "存檔", save)
-	TDEditorStyle.paint_save(_save_button, false)
+	LevelEditorStyle.paint_save(_save_button, false)
 	_load_list = OptionButton.new()
 	_load_list.custom_minimum_size = Vector2(150, 0)
 	_load_list.focus_mode = Control.FOCUS_NONE
@@ -392,7 +392,7 @@ func _add_wave_title(wave: int, count: int) -> void:
 	var play: Button = _button(line, "▶ 從這波試玩", func() -> void:
 		commit()
 		test_requested.emit(wave + 1))
-	TDEditorStyle.paint(play, TDEditorStyle.PLAY)
+	LevelEditorStyle.paint(play, LevelEditorStyle.PLAY)
 
 
 func _add_row(wave: int, index: int, row: Wave) -> void:
@@ -426,7 +426,7 @@ func _add_row(wave: int, index: int, row: Wave) -> void:
 	_row_spin(line, row, "speed", 0, 500, 5, "", 80)
 	var speed: Label = _label(line, "", 60, 13)
 	_row_labels[row] = [health, speed]
-	TDEditorStyle.paint_text(_button(line, "✕", delete_row.bind(wave, index)), TDEditorStyle.DANGER)
+	LevelEditorStyle.paint_text(_button(line, "✕", delete_row.bind(wave, index)), LevelEditorStyle.DANGER)
 
 
 func _update_labels() -> void:

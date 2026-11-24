@@ -109,7 +109,7 @@ func refresh() -> void:
 		_party_box.add_child(line)
 		_label(line, "%d　%s%s" % [i + 1, TacticsUnitInfo.look(map.party[i])["name"], "　★隊長" if i == 0 else ""], 220)
 		_button(line, "▲", move_up.bind(i)).disabled = i == 0
-		TacticsEditorStyle.paint_text(_button(line, "✕", remove_member.bind(i)), TacticsEditorStyle.DANGER)
+		LevelEditorStyle.paint_text(_button(line, "✕", remove_member.bind(i)), LevelEditorStyle.DANGER)
 	_party_box.add_child(HSeparator.new())
 	_label(_party_box, "加一隻：", 0, 15)
 	var choices: HFlowContainer = HFlowContainer.new()
@@ -123,7 +123,7 @@ func refresh() -> void:
 		var row: HBoxContainer = HBoxContainer.new()
 		_party_box.add_child(row)
 		_label(row, TacticsUnitInfo.look(map.rewards[i])["name"], 220)
-		TacticsEditorStyle.paint_text(_button(row, "✕", remove_reward.bind(i)), TacticsEditorStyle.DANGER)
+		LevelEditorStyle.paint_text(_button(row, "✕", remove_reward.bind(i)), LevelEditorStyle.DANGER)
 	var gifts: HFlowContainer = HFlowContainer.new()
 	_party_box.add_child(gifts)
 	for path: String in TacticsUnitInfo.paths():

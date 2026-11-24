@@ -53,6 +53,7 @@
   ```
 
   README、`docs/ai_guide.md`、`CONTRIBUTING.md`、`game_config.tres`、`project.godot` 兩邊內容不一樣，衝突時保留這裡的版本，再把起手包新增的部分補進來
+- `core/level_editor/`：關卡編輯器的底（也是起手包的一部分），三個範例的編輯器都繼承它。改它要三份範例測試＋`core_test` 都跑
 - `addons/ngdc_pathfinding/`：尋路積木，**整包複製到別的專案也要能用**（不用 Autoload、不依賴 `examples/`；用到起手包的 GameFlow 時用 `get_node_or_null("/root/GameFlow")`，沒有就跳過）
 - `examples/`：用積木組成的範例遊戲（追逐、塔防、戰棋），範例自己的小腳本放在範例的 `features/`
 - `features/`、`levels/`、`shared/`：留給各組，保持空的
@@ -65,9 +66,10 @@
 - GDScript 一律**靜態型別**，不要有編輯器警告；`@export` 加 `##` 中文說明
 - 積木要跟玩法無關：用 `@export` 調參數、用 signal 通知事件，彼此不寫死
 - 附自動測試，用 headless 跑，失敗時 exit code 非 0：
-  - `godot --headless --path . res://core/tests/core_test.tscn`
-  - `godot --headless --path . res://addons/ngdc_pathfinding/tests/pathfinding_test.tscn`（還有 `chase_ai_test`、`astar_lab_test`）
-  - `godot --headless --path . res://examples/_tests/examples_test.tscn`
+  - `godot --headless --fixed-fps 60 --path . res://core/tests/core_test.tscn`
+  - `godot --headless --fixed-fps 60 --path . res://addons/ngdc_pathfinding/tests/pathfinding_test.tscn`（還有 `chase_ai_test`、`astar_lab_test`）
+  - `godot --headless --fixed-fps 60 --path . res://examples/_tests/chase_test.tscn`（還有 `tower_defense_test`、`tactics_test`）
+  - `--fixed-fps 60` 一定要加：比較快，結果也不會受電腦忙不忙影響
 - 範例的關卡用 `_dev/tools/make_examples.tscn` 從文字地圖產生，改地圖改那裡
 - 更新 `addons/ngdc_pathfinding/README.md` 和 `docs/ai_guide.md`：有什麼、怎麼用、不要重寫什麼
 

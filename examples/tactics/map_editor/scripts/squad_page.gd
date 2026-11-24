@@ -49,7 +49,7 @@ func _ready() -> void:
 		selected.emit())
 	left.add_child(_list)
 	_button(left, "＋ 新小隊", add_squad)
-	TacticsEditorStyle.paint(_button(left, "刪掉這一隊", remove_squad), TacticsEditorStyle.DANGER)
+	LevelEditorStyle.paint(_button(left, "刪掉這一隊", remove_squad), LevelEditorStyle.DANGER)
 	var scroll: ScrollContainer = ScrollContainer.new()           # 隊員很多的時候可以捲
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -188,7 +188,7 @@ func refresh() -> void:
 		_label(line, "%s%s" % [TacticsUnitInfo.look(squad().members[i])["name"], "　★帶頭" if i == 0 else ""], 160)
 		if i > 0:
 			_button(line, "改成帶頭", make_leader.bind(i))
-		TacticsEditorStyle.paint_text(_button(line, "✕", remove_member.bind(i)), TacticsEditorStyle.DANGER)
+		LevelEditorStyle.paint_text(_button(line, "✕", remove_member.bind(i)), LevelEditorStyle.DANGER)
 
 
 func _check(text: String, field: String) -> void:

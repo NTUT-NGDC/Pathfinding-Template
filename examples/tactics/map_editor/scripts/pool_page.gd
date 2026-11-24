@@ -88,7 +88,7 @@ func refresh() -> void:
 		_box.add_child(line)
 		_label(line, "%d　%s" % [i + 1, TacticsUnitInfo.look(start[i])["name"]]).custom_minimum_size = Vector2(220, 0)
 		_button(line, "▲", move_up.bind(i)).disabled = i == 0
-		TacticsEditorStyle.paint_text(_button(line, "✕", remove_member.bind(i)), TacticsEditorStyle.DANGER)
+		LevelEditorStyle.paint_text(_button(line, "✕", remove_member.bind(i)), LevelEditorStyle.DANGER)
 	_box.add_child(HSeparator.new())
 	_label(_box, "加一個：")
 	var choices: HFlowContainer = HFlowContainer.new()
@@ -97,7 +97,7 @@ func refresh() -> void:
 		_button(choices, "＋ " + String(TacticsUnitInfo.look(path)["name"]), add_member.bind(path))
 	_box.add_child(HSeparator.new())
 	_save_button = _button(_box, "存檔", save)
-	TacticsEditorStyle.paint_save(_save_button, is_dirty())
+	LevelEditorStyle.paint_save(_save_button, is_dirty())
 
 	_label(_info, "隊伍怎麼變多", 18)
 	_label(_info, "・過關獎勵：「規則」頁設定這一關過了加入誰\n・招募：「地圖」頁用「同伴」放在路上，走過去按 E 加入\n・試玩時只有起始隊伍，加入的人不會存起來")
@@ -105,7 +105,7 @@ func refresh() -> void:
 	_label(_info, "這台電腦的玩家存檔", 18)
 	var joined: Array[String] = TacticsPool.units().slice(TacticsPool.start_units().size())
 	_label(_info, "加入過的人：" + ("、".join(joined.map(func(p: String) -> String: return TacticsUnitInfo.look(p)["name"])) if not joined.is_empty() else "還沒有"))
-	TacticsEditorStyle.paint(_button(_info, "清掉玩家存檔（測試招募用）", clear_joined), TacticsEditorStyle.DANGER)
+	LevelEditorStyle.paint(_button(_info, "清掉玩家存檔（測試招募用）", clear_joined), LevelEditorStyle.DANGER)
 
 
 func _label(parent: Control, text: String, font_size: int = 15) -> Label:
