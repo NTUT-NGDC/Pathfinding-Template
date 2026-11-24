@@ -317,14 +317,14 @@ func _test_tower_defense() -> void:
 	var open_cell: Vector2i = grid.cell_of(base.global_position) + Vector2i(-5, 3)
 	builder.selected = 0
 	_expect(builder.build(open_cell) and money.score == 11, "蓋牆：扣 1 元")
-	_expect(not grid.is_cell_walkable(open_cell), "牆擋路")
+	_expect(grid.is_cell_walkable(open_cell) and grid.cost_of(open_cell) == 12.0, "牆：走得過去但很貴（要先打破）")
 	_expect(not builder.build(open_cell), "同一格不能蓋兩次")
-	_expect(builder.remove(open_cell) and grid.is_cell_walkable(open_cell), "右鍵拆掉：又可以走")
+	_expect(builder.remove(open_cell) and grid.cost_of(open_cell) == 1.0 and grid.obstacle_at(open_cell) == null, "右鍵拆掉：不貴了")
 
 	# 把基地圍起來，最後一格不能蓋（會堵死）
 	var base_cell: Vector2i = grid.cell_of(base.global_position)
 	money.score = 100
-	var sealed: bool = true
+	builder.selected = 1                                          # 塔打不壞，所以不能堵死
 	for d: Vector2i in [Vector2i(-1, 0), Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, -1), Vector2i(-1, 1)]:
 		var cell: Vector2i = base_cell + d
 		if grid.is_cell_walkable(cell) and builder.can_build(cell):
@@ -362,9 +362,188 @@ func _test_tower_defense() -> void:
 	await _test_td_map()
 	await _test_td_multi()
 	await _test_td_build_rules()
+	await _test_td_walls()
+	await _test_td_upgrade()
 	await _test_td_enemy_traits()
 	await _test_td_towers_and_hud()
 	await _test_map_editor()
+
+
+## 打得壞的牆：堵死會拆、繞路便宜就繞、成本高低決定、多隻一起打、飛行怪不理牆、沼澤上的牆、不能斜鑽
+func _test_td_walls() -> void:
+	await _load_td()
+	var loader: MapLoader = _level.get_node("MapLoader")
+	var builder: Builder = _level.get_node("Builder")
+	var grid: PathGrid = get_tree().get_first_node_in_group("path_grid")
+	var spawner: Spawner = _level.get_node("Spawner")
+	var money: ScoreDisplay = _level.get_node("HUD/Info/Money")
+	var base: Node2D = builder.goal_points()[0]
+	spawner.win_when_cleared = false                              # 這裡自己生怪，不要關卡的波次跑來干擾
+	spawner.waves = []
+	money.score = 1000
+	builder.selected = 0
+	var start: Vector2i = grid.cell_of(spawner.global_position)
+
+	# 一面牆：繞路便宜就繞
+	var wall_cell: Vector2i = start + Vector2i(2, 0)
+	builder.build(wall_cell)
+	_expect(not _path_has(grid, spawner.global_position, base.global_position, wall_cell), "一面牆：繞過去比較便宜，不拆")
+
+	# 一整排牆：堵死，可以蓋，怪會拆
+	var all_built: bool = true
+	for y: int in loader.map.size.y:
+		var cell: Vector2i = grid.cell_of(loader.to_global(loader.map.cell_center(Vector2i(3, y))))
+		if not builder.buildings.has(cell) and grid.is_cell_walkable(cell):
+			all_built = builder.build(cell) and all_built
+	_expect(all_built and grid.has_path(spawner.global_position, base.global_position), "用牆整排堵死：可以蓋，路還是通的（要拆牆）")
+	var middle: Vector2i = start + Vector2i(2, 0)
+	var wall: TDWall = builder.buildings[middle] as TDWall
+	_expect(wall != null and _path_has(grid, spawner.global_position, base.global_position, middle), "堵死：走直的拆中間那面")
+	_expect(builder.building_text(middle) == "牆 6/6", "滑鼠移到牆上：血量（%s）" % builder.building_text(middle))
+
+	var wave: Wave = Wave.new()
+	wave.speed = 200.0
+	wave.health = 500.0
+	var a: Walker = spawner.spawn(wave)
+	var follower: PathFollower = a.get_node("PathFollower")
+	await _wait_until(func() -> bool: return wall.health < 5.0, 600)
+	_expect(follower.is_breaking() and wall.health < 5.0 and a.global_position.distance_to(wall.global_position) < 40.0, "怪走到牆前停下來打（牆 %.1f 滴血）" % wall.health)
+	var refund_before: int = money.score
+	var alone_health: float = wall.health
+	await _physics_frames(30)
+	var alone: float = alone_health - wall.health
+	var b: Walker = spawner.spawn(wave)
+	await _wait_until(func() -> bool: return (b.get_node("PathFollower") as PathFollower).is_breaking(), 600)
+	wall.health = 6.0
+	await _physics_frames(30)
+	var together: float = 6.0 - wall.health
+	_expect(together > alone * 1.8, "兩隻一起打：快一倍（%.2f → %.2f）" % [alone, together])
+	await _wait_until(func() -> bool: return not builder.buildings.has(middle), 1200)
+	_expect(not builder.buildings.has(middle) and grid.obstacle_at(middle) == null and grid.cost_of(middle) == 1.0, "牆被打破：那一格恢復可以走")
+	_expect(money.score == refund_before, "被打破的牆不退錢")
+	await _wait_until(func() -> bool: return is_instance_valid(a) and is_instance_valid(b) and a.global_position.x > grid.cell_center(middle).x + 64.0 and b.global_position.x > grid.cell_center(middle).x + 64.0, 600)
+	_expect(is_instance_valid(a) and a.global_position.x > grid.cell_center(middle).x + 64.0 and b.global_position.x > grid.cell_center(middle).x + 64.0, "打破之後：兩隻都繼續走（不會卡住）")
+
+	# 正在打的牆被玩家拆掉：怪不會卡住
+	builder.build(middle)
+	var c: Walker = spawner.spawn(wave)
+	await _wait_until(func() -> bool: return (c.get_node("PathFollower") as PathFollower).is_breaking(), 600)
+	_expect((c.get_node("PathFollower") as PathFollower).is_breaking(), "牆補回去：下一隻又停下來打")
+	builder.remove(middle)
+	await _wait_until(func() -> bool: return is_instance_valid(c) and c.global_position.x > grid.cell_center(middle).x + 64.0, 600)
+	_expect(is_instance_valid(c) and c.global_position.x > grid.cell_center(middle).x + 64.0, "打到一半牆被玩家拆掉：繼續走")
+
+	# 會飛的怪不理牆
+	builder.build(middle)
+	var flyer: Walker = spawner.adopt((load("res://examples/tower_defense/features/enemies/flyer.tscn") as PackedScene).instantiate(), spawner.global_position)
+	flyer.speed = 200.0
+	await _wait_until(func() -> bool: return is_instance_valid(flyer) and flyer.global_position.x > grid.cell_center(middle).x + 64.0, 600)
+	_expect((builder.buildings[middle] as TDWall).health == 6.0 and is_instance_valid(flyer) and flyer.global_position.x > grid.cell_center(middle).x, "會飛的怪：不打牆，直接飛過去")
+
+	# 拆牆等於多走幾格：便宜就拆、貴就繞（開一個遠遠的缺口）
+	var gap: Vector2i = grid.cell_of(loader.to_global(loader.map.cell_center(Vector2i(3, 1))))
+	builder.remove(gap)
+	wall = builder.buildings[middle]
+	wall.break_cost = 5.0
+	wall.obstacle_changed.emit()
+	_expect(_path_has(grid, spawner.global_position, base.global_position, middle), "缺口很遠、拆牆便宜（5）：拆牆")
+	for cell: Vector2i in builder.buildings:
+		(builder.buildings[cell] as TDWall).break_cost = 60.0
+		(builder.buildings[cell] as TDWall).obstacle_changed.emit()
+	_expect(_path_has(grid, spawner.global_position, base.global_position, gap), "拆牆很貴（60）：寧可繞到遠遠的缺口")
+
+	# 沼澤上的牆：拆掉之後還是沼澤
+	var swamp: Vector2i = Vector2i(-1, -1)
+	for y: int in loader.map.size.y:
+		for x: int in loader.map.size.x:
+			if loader.map.is_swamp(Vector2i(x, y)):
+				swamp = grid.cell_of(loader.to_global(loader.map.cell_center(Vector2i(x, y))))
+	builder.build(swamp)
+	var on_swamp: float = grid.cost_of(swamp)
+	(builder.buildings[swamp] as TDWall).damage(999.0)
+	_expect(on_swamp == 12.0 and grid.cost_of(swamp) == loader.swamp_cost, "沼澤上的牆打破：還是沼澤（%.0f → %.0f）" % [on_swamp, grid.cost_of(swamp)])
+
+	# 不能從斜放的兩面牆中間鑽過去
+	_expect(grid.diagonal == 0, "塔防不斜走：不會從斜放的牆中間鑽過去")
+
+	# 打不壞的牆：跟以前一樣不能走、不能堵死
+	await _load_td()
+	builder = _level.get_node("Builder")
+	grid = get_tree().get_first_node_in_group("path_grid")
+	spawner = _level.get_node("Spawner")
+	(_level.get_node("HUD/Info/Money") as ScoreDisplay).score = 100
+	var hard: TDWall = builder.wall_scene.instantiate()
+	hard.breakable = false
+	var packed: PackedScene = PackedScene.new()
+	packed.pack(hard)
+	hard.free()
+	builder.wall_scene = packed
+	(builder.get("_wall_sample") as TDWall).breakable = false
+	builder.selected = 0
+	start = grid.cell_of(spawner.global_position)
+	var last_reason: String = ""
+	for d: Vector2i in [Vector2i(1, 0), Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, 0)]:
+		if not builder.build(start + d):
+			last_reason = builder.why_not(start + d)
+	_expect(not grid.is_cell_walkable(start + Vector2i(1, 0)) and last_reason == "會把路堵死：怪會走不到基地", "Breakable 不勾：牆不能走、不能堵死（%s）" % last_reason)
+	builder.remove(start + Vector2i(1, 0))
+	_expect(grid.is_cell_walkable(start + Vector2i(1, 0)), "打不壞的牆拆掉：又可以走")
+
+
+## 從 from 到 to 的路有沒有經過 cell
+func _path_has(grid: PathGrid, from: Vector2, to: Vector2, cell: Vector2i) -> bool:
+	for point: Vector2 in grid.find_path(from, to):
+		if grid.cell_of(point) == cell:
+			return true
+	return false
+
+
+func _physics_frames(count: int) -> void:
+	for i: int in count:
+		await get_tree().physics_frame
+
+
+## 升級：價格、數值、滿級、錢不夠、退錢、左鍵點塔
+func _test_td_upgrade() -> void:
+	await _load_td()
+	var builder: Builder = _level.get_node("Builder")
+	var grid: PathGrid = get_tree().get_first_node_in_group("path_grid")
+	var spawner: Spawner = _level.get_node("Spawner")
+	var money: ScoreDisplay = _level.get_node("HUD/Info/Money")
+	await _frames(2)
+	money.score = 100
+	builder.selected = 1
+	var cell: Vector2i = grid.cell_of(spawner.global_position) + Vector2i(3, 3)
+	builder.build(cell)
+	var tower: Tower = builder.tower_at(cell)
+	_expect(tower.level == 1 and tower.upgrade_cost() == 3 and builder.building_text(cell) == "Lv1 → Lv2　3 元", "升級價格：照強幾倍算（%s）" % builder.building_text(cell))
+	var click: InputEventMouseButton = InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.pressed = true
+	click.position = builder.get_global_transform_with_canvas() * builder.to_local(grid.cell_center(cell))
+	builder._unhandled_input(click)
+	_expect(tower.level == 2 and money.score == 93, "左鍵點塔：升到 Lv2、扣 3 元（剩 %d）" % money.score)
+	_expect(is_equal_approx(tower.damage, 1.5) and is_equal_approx(tower.attack_range, 105.6) and is_equal_approx(tower.fire_interval, 0.5), "Lv2：傷害 ×1.5、射程 ×1.1、攻速不變")
+	money.score = 3
+	_expect(not builder.upgrade(cell) and builder.why_not_upgrade(cell) == "錢不夠（升級要 4 元）" and builder.building_text(cell).ends_with("（錢不夠）") and tower.level == 2, "錢不夠：不能升（%s）" % builder.why_not_upgrade(cell))
+	money.score = 100
+	_expect(builder.upgrade(cell) and money.score == 96 and is_equal_approx(tower.damage, 2.25) and tower.spent == 11, "Lv3：扣 4 元、傷害 2.25、總共花 11 元")
+	_expect(not builder.upgrade(cell) and builder.building_text(cell) == "已經滿級（Lv3）" and money.score == 96, "滿級：不能再升、不扣錢")
+	builder.remove(cell)
+	_expect(money.score == 101, "拆掉：退總共花的一半（5 元）")
+	tower = (load("res://examples/tower_defense/features/tower/multi_tower.tscn") as PackedScene).instantiate()
+	_level.add_child(tower)
+	var prices: Array[int] = [tower.upgrade_cost()]
+	tower.upgrade()
+	prices.append(tower.upgrade_cost())
+	_expect(prices == [7, 11], "連射塔：升級 7、11 元（%s）" % [prices])
+	tower.speed_per_level = 2.0
+	tower.upgrade()
+	_expect(is_equal_approx(tower.fire_interval, 0.25) and not tower.upgrade(), "攻速 ×2：間隔變一半")
+	tower.queue_free()
+	builder.build(cell)
+	builder.tower_at(cell).max_level = 1
+	_expect(builder.why_not_upgrade(cell) == "這種塔不能升級", "最高等級 1：不能升級")
 
 
 ## 塔防關卡會把倍速按鈕設回 1×，測試要再調回來
@@ -466,14 +645,14 @@ func _test_td_multi() -> void:
 	group.on_base_hit(bases[1] as Base)
 	_expect(GameFlow.is_finished(), "一個爆就輸：一個被打爆就輸")
 
-	# 不能堵死：把出怪口 1 圍起來，最後一格蓋不下去
+	# 塔不能堵死：把出怪口 1 圍起來，最後一格蓋不下去
 	MapLoader.test_map = load("res://examples/tower_defense/maps/two_gates.tres").duplicate(true)
 	await _load_td()
 	spawner = _level.get_node("Spawner")
 	grid = get_tree().get_first_node_in_group("path_grid")
 	builder = _level.get_node("Builder")
 	(_level.get_node("HUD/Info/Money") as ScoreDisplay).score = 100
-	builder.selected = 0
+	builder.selected = 1
 	var start: Vector2i = grid.cell_of(spawner.spawn_points()[0].global_position)
 	var blocked_last: bool = false
 	for d: Vector2i in [Vector2i(1, 0), Vector2i(0, -1), Vector2i(0, 1), Vector2i(1, -1), Vector2i(1, 1), Vector2i(-1, -1), Vector2i(-1, 1), Vector2i(-1, 0)]:
@@ -547,7 +726,7 @@ func _test_td_towers_and_hud() -> void:
 	var money: ScoreDisplay = _level.get_node("HUD/Info/Money")
 	var grid: PathGrid = get_tree().get_first_node_in_group("path_grid")
 	var bar: HBoxContainer = _level.get_node("HUD/BuildBar")
-	_expect(bar.get_child_count() == builder.option_count() and builder.option_count() == 4, "下面的按鈕：牆＋3 種塔")
+	_expect(bar.get_child_count() == builder.option_count() and builder.option_count() == 5, "下面的按鈕：牆＋4 種塔")
 	(bar.get_child(2) as Button).pressed.emit()
 	_expect(builder.selected == 2 and builder.cost_of(2) == 6, "按「緩速塔」：選到、6 元")
 	money.score = 100
@@ -580,15 +759,62 @@ func _test_td_towers_and_hud() -> void:
 	_level.add_child(splash)
 	splash.global_position = a.global_position + Vector2(-40, 0)
 	await _wait_until(func() -> bool: return a.health < 50.0, 60)
-	_expect(a.health == 49.0 and b.health == 49.5 and c.health == 50.0, "範圍塔：旁邊的怪也扣一半（%.1f／%.1f／%.1f）" % [a.health, b.health, c.health])
+	_expect(a.health == 49.0 and b.health == 49.25 and c.health == 50.0, "範圍塔：旁邊的怪扣 0.75（%.2f／%.2f／%.2f）" % [a.health, b.health, c.health])
 	splash.queue_free()
 	var multi: Tower = (load("res://examples/tower_defense/features/tower/tower.tscn") as PackedScene).instantiate()
 	multi.add_child((load("res://examples/tower_defense/features/tower_traits/multi_shot.tscn") as PackedScene).instantiate())
 	_level.add_child(multi)
 	multi.global_position = a.global_position + Vector2(-40, 0)
 	multi.attack_range = 400.0
-	_expect(multi.targets_per_shot == 3 and multi.nearest_enemies(3).size() == 3, "多重射擊：一次打 3 隻")
+	_expect(multi.targets_per_shot == 3 and multi.pick_targets(3).size() == 3, "多重射擊：一次打 3 隻")
 	multi.queue_free()
+	var multi_tower: Tower = (load("res://examples/tower_defense/features/tower/multi_tower.tscn") as PackedScene).instantiate()
+	_level.add_child(multi_tower)
+	_expect(multi_tower.targets_per_shot == 3 and multi_tower.display_name == "連射塔", "連射塔：一次打 3 隻")
+	multi_tower.queue_free()
+
+	# 先打誰
+	var picker: Tower = (load("res://examples/tower_defense/features/tower/tower.tscn") as PackedScene).instantiate()
+	_level.add_child(picker)
+	picker.set_physics_process(false)                             # 只看它選誰，不要真的打
+	picker.attack_range = 400.0
+	picker.global_position = a.global_position + Vector2(-40, 0)
+	a.health = 20.0
+	b.health = 50.0
+	c.health = 5.0
+	_expect(picker.pick_targets(1) == [a], "先打誰：離塔最近（預設）")
+	picker.target_priority = Tower.Priority.MOST_HEALTH
+	_expect(picker.pick_targets(1) == [b], "先打誰：血最多")
+	picker.target_priority = Tower.Priority.LEAST_HEALTH
+	_expect(picker.pick_targets(1) == [c], "先打誰：血最少")
+	for w: Walker in [a, b, c]:
+		(w.get_node("PathFollower") as PathFollower).speed = 0.0
+		(w.get_node("PathFollower") as PathFollower).go_to(builder.goal_points()[0].global_position)
+	picker.target_priority = Tower.Priority.CLOSEST_TO_BASE
+	_expect((c.get_node("PathFollower") as PathFollower).remaining_distance() < (a.get_node("PathFollower") as PathFollower).remaining_distance() and picker.pick_targets(1) == [c], "先打誰：最接近基地（剩下的路最短）")
+	(c.get_node("PathFollower") as PathFollower).stop()
+	_expect((c.get_node("PathFollower") as PathFollower).remaining_distance() == INF and picker.pick_targets(1) != [c], "沒有在走的怪：排最後")
+	picker.target_priority = Tower.Priority.NEAREST
+	a.damage(1000.0)
+	_expect(picker.pick_targets(3).size() == 2 and not picker.pick_targets(3).has(a), "剛被打死、還沒消失的怪：不打")
+	picker.queue_free()
+
+	# 名字和數字鍵
+	_expect(builder.option_label(3) == "範圍塔 6 元" and builder.option_label(4) == "連射塔 10 元", "按鈕的字：塔的 Display Name（%s）" % builder.option_label(4))
+	var number: InputEventKey = InputEventKey.new()
+	number.physical_keycode = KEY_5
+	number.pressed = true
+	builder._unhandled_input(number)
+	_expect(builder.selected == 4 and (bar.get_child(4) as Button).text.begins_with("5 "), "按 5：選到連射塔")
+	number.physical_keycode = KEY_1
+	number.keycode = KEY_1
+	builder._unhandled_input(number)
+	_expect(builder.selected == 0, "按 1：選到牆")
+	var same_name: Builder = Builder.new()
+	same_name.tower_scenes = [load("res://examples/tower_defense/features/tower/tower.tscn"), load("res://examples/tower_defense/features/tower/tower.tscn")]
+	_level.add_child(same_name)
+	_expect(same_name.option_label(1) == "塔 4 元" and same_name.option_label(2) == "塔2 4 元", "名字一樣的塔：後面的加號碼（%s）" % same_name.option_label(2))
+	same_name.queue_free()
 	_expect(built_slow, "蓋出來的是緩速塔")
 
 	var speed_button: Button = _level.get_node("HUD/SpeedButton")
@@ -704,7 +930,7 @@ func _test_map_editor() -> void:
 	_expect(get_tree().current_scene != play and loader.is_test_play and play.get_parent() == editor, "試玩的關卡放在編輯器底下")
 	_expect(not (editor.get("_ui") as CanvasLayer).visible and (editor.get("_stop_button") as Button).visible, "試玩時：編輯的介面藏起來、出現「停止試玩」")
 	_expect(GameFlow.is_pause_enabled(), "試玩時：有暫停選單")
-	_expect(builder.tower_ground == map.tower_ground and not builder.has_walls() and builder.options() == [1, 2, 3], "地圖的規則交給 Builder：高地和岩石可以蓋塔、沒有牆")
+	_expect(builder.tower_ground == map.tower_ground and not builder.has_walls() and builder.options() == [1, 2, 3, 4], "地圖的規則交給 Builder：高地和岩石可以蓋塔、沒有牆")
 	(play.get_node("HUD/Info/Money") as ScoreDisplay).score = 100
 	var high_cell: Vector2i = grid.cell_of(loader.to_global(map.cell_center(Vector2i(10, 2))))
 	var floor_cell: Vector2i = grid.cell_of(loader.to_global(map.cell_center(Vector2i(10, 8))))
@@ -762,13 +988,12 @@ func _test_td_build_rules() -> void:
 	money.score = 100
 	_expect(builder.why_not(rock_cell) == "塔只能蓋在空地、沼澤、高地上", "岩石：說明哪裡才能蓋（%s）" % builder.why_not(rock_cell))
 	_expect(builder.why_not(grid.cell_of(spawner.global_position)) == "出怪口、基地上不能蓋", "出怪口上：說明不能蓋")
-	builder.selected = 0
 	var start: Vector2i = grid.cell_of(spawner.global_position)
 	var reason: String = ""
 	for d: Vector2i in [Vector2i(1, 0), Vector2i(0, -1), Vector2i(0, 1), Vector2i(1, -1), Vector2i(1, 1), Vector2i(-1, -1), Vector2i(-1, 1), Vector2i(-1, 0)]:
 		if grid.is_cell_walkable(start + d) and not builder.build(start + d):
 			reason = builder.why_not(start + d)
-	_expect(reason == "會把路堵死：怪會走不到基地", "把出怪口圍起來：最後一格說明會堵死（%s）" % reason)
+	_expect(reason == "會把路堵死：怪會走不到基地", "用塔把出怪口圍起來：最後一格說明會堵死（%s）" % reason)
 
 	MapLoader.test_map = load("res://examples/tower_defense/maps/fixed_route.tres").duplicate(true)
 	await _load_td()
@@ -777,7 +1002,7 @@ func _test_td_build_rules() -> void:
 	spawner = _level.get_node("Spawner")
 	var bar: HBoxContainer = _level.get_node("HUD/BuildBar")
 	await _frames(2)
-	_expect(not builder.has_walls() and builder.tower_ground == 1 << TDMap.Ground.HIGH and bar.get_child_count() == 3, "固定路線地圖：沒有牆的按鈕、塔只能蓋高地")
+	_expect(not builder.has_walls() and builder.tower_ground == 1 << TDMap.Ground.HIGH and bar.get_child_count() == 4, "固定路線地圖：沒有牆的按鈕、塔只能蓋高地")
 	var bases: Array[Node2D] = builder.goal_points()
 	var path: PackedVector2Array = grid.find_path(spawner.global_position, bases[0].global_position)
 	_expect(not path.is_empty() and grid.cell_of(path[path.size() - 1]) == grid.cell_of(bases[0].global_position), "固定路線地圖：怪走得到基地")

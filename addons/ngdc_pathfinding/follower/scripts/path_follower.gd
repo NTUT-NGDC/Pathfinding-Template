@@ -6,6 +6,7 @@ extends Node2D
 ##   stop()：停下來
 ## 地圖變了（放了牆、門打開）會自動重算路徑。
 ## 遇到關著的門（有 open() 的障礙物）會停下來，等「開門要幾秒」再打開。
+## 遇到打得壞的東西（有 damage()、is_broken 的障礙物，例如塔防的牆）會停下來打，打破再走。
 ##
 ## 角色是 CharacterBody2D 的話用 move_and_slide()（會撞牆）；其他 Node2D 直接移動位置。
 ## 需要場景裡有一個尋路地圖（PathGrid）。
@@ -24,6 +25,8 @@ signal path_blocked()
 @export var use_pathfinding: bool = true
 ## 開一扇門要幾秒
 @export_range(0.0, 5.0, 0.1, "suffix:秒") var door_open_time: float = 1.0
+## 打擋路的東西（打得壞的牆）：每秒扣幾滴血
+@export_range(0.1, 100.0, 0.1) var break_power: float = 1.0
 ## 離路徑點多近就算到了（像素）
 @export_range(1.0, 32.0, 1.0, "suffix:px") var arrive_distance: float = 4.0
 
@@ -88,9 +91,31 @@ func is_moving() -> bool:
 	return _has_target
 
 
-## 正在開門嗎
+## 沿著路走到終點還有多遠（像素）。沒有路＝INF
+func remaining_distance() -> float:
+	if _body == null or not _has_target or path.is_empty():
+		return INF
+	var total: float = 0.0
+	var from: Vector2 = _body.global_position
+	for point: Vector2 in path:
+		total += from.distance_to(point)
+		from = point
+	return total
+
+
+## 正在開門（或打擋路的東西）嗎
 func is_opening_door() -> bool:
 	return _door != null
+
+
+## 正在打擋路的東西嗎
+func is_breaking() -> bool:
+	return is_instance_valid(_door) and _is_breakable(_door)
+
+
+## 打得壞、還沒壞的障礙物
+func _is_breakable(node: Node2D) -> bool:
+	return node.has_method("damage") and node.get("is_broken") == false and node.get("blocks_path") != true
 
 
 func _physics_process(delta: float) -> void:
@@ -170,12 +195,15 @@ func _make_path(target: Vector2) -> PackedVector2Array:
 	return result
 
 
-## 下一個點是關著的門、而且已經走到門前 → 開始開門
+## 下一個點是關著的門（或打得壞的東西）、而且已經走到前面 → 開始開門（打它）
 func _start_opening_door(next_point: Vector2) -> bool:
 	if _grid == null or not use_pathfinding:
 		return false
 	var door: Node2D = _grid.obstacle_at(_grid.cell_of(next_point))
-	if door == null or not door.has_method("open") or door.get("is_open") != false or door.get("blocks_path") == true:
+	if door == null:
+		return false
+	var closed_door: bool = door.has_method("open") and door.get("is_open") == false and door.get("blocks_path") != true
+	if not closed_door and not _is_breakable(door):
 		return false
 	if _body.global_position.distance_to(door.global_position) > _cell_length() + arrive_distance:
 		return false
@@ -190,8 +218,11 @@ func _start_opening_door(next_point: Vector2) -> bool:
 
 func _update_door(delta: float) -> void:
 	_door_timer -= delta
-	if not is_instance_valid(_door) or _door.get("is_open") == true:
-		_door = null                                              # 別人先開了
+	if not is_instance_valid(_door) or _door.get("is_open") == true or _door.get("is_broken") == true:
+		_door = null                                              # 別人先開了（打破了）
+	elif not _door.has_method("open"):
+		_door.call("damage", break_power * delta)                 # 打得壞的東西：一直打到破（破了會發 map_changed，在那裡重新找路）
+		return
 	elif _door_timer <= 0.0:
 		_door.call("open")
 		_door = null
@@ -211,6 +242,8 @@ func _connect_grid() -> void:
 
 
 func _on_map_changed() -> void:
+	if not is_instance_valid(_door) or not _door.has_method("open"):
+		_door = null                                              # 在打牆：地圖變了就重新想要繞路還是繼續打（牆扣的血會留著）
 	if _has_target and _door == null:
 		_repath()
 

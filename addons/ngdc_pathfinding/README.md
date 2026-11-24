@@ -44,6 +44,7 @@ F1 視野錐　F2 路徑　F3 追逐 AI 狀態　F4 聲音圈圈　F5 格子線�
 - 塔防放牆：`grid.set_blocked(格子, true)`；放之前先問 `grid.would_block(格子, 出怪口, 基地)`，會把路堵死就不要放
 - 殭屍挑弱的門：`grid.set_cost(格子, 10)` 讓堅固的門很貴
 - 門這種會開關的東西：做成 obstacle（加進 group「path_obstacles」，有 `blocks_path`、`path_cost`、`is_open`、`open()`、signal `obstacle_changed`），尋路地圖會自動登記；PathFollower 遇到關著的門會停下來開。範例：`examples/chase/features/door/`
+- 打得壞的牆：一樣做成 obstacle，再加 `is_broken`、`damage(傷害)`，PathFollower 走到前面會停下來打（Break Power）。範例：`examples/tower_defense/features/builder/block.tscn`
 - 地圖一變，所有正在走路的角色會自動重算路徑
 
 ### 被追的目標可以有（都可以沒有）

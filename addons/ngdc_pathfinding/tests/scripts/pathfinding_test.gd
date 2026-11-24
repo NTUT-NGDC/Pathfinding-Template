@@ -106,6 +106,17 @@ func _test_dynamic_map() -> void:
 	door.call("open")
 	_expect(is_equal_approx(_grid.astar.get_point_weight_scale(Vector2i(5, 4)), 1.0), "門打開：不貴了")
 
+	# 拿掉障礙物：底下原本的成本還在
+	_grid.set_cost(Vector2i(3, 3), 3.0)
+	var on_swamp: Node2D = TestDoor.new()
+	on_swamp.position = _center(Vector2i(3, 3))
+	_level.add_child(on_swamp)
+	_grid.register_obstacle(on_swamp)
+	var with_door: float = _grid.cost_of(Vector2i(3, 3))
+	_grid.unregister_obstacle(on_swamp)
+	_expect(with_door == 4.0 and _grid.cost_of(Vector2i(3, 3)) == 3.0, "拿掉障礙物：底下的沼澤成本還在（%.0f → %.0f）" % [with_door, _grid.cost_of(Vector2i(3, 3))])
+	on_swamp.queue_free()
+
 
 func _test_follower() -> void:
 	print("--- 跟著路徑走 ---")

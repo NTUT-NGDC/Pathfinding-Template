@@ -38,6 +38,9 @@ var _blocked: Dictionary[Vector2i, bool] = {}
 var _costs: Dictionary[Vector2i, float] = {}
 ## 登記的障礙物：格子 → 節點
 var _obstacles: Dictionary[Vector2i, Node2D] = {}
+## 障礙物底下原本用程式設定的擋路、成本（例如沼澤），拿掉障礙物時還原
+var _under_blocked: Dictionary[Vector2i, bool] = {}
+var _under_costs: Dictionary[Vector2i, float] = {}
 
 
 func _enter_tree() -> void:
@@ -124,6 +127,14 @@ func find_path(from: Vector2, to: Vector2) -> PackedVector2Array:
 	return path
 
 
+## 走完一條路要多少成本（像素 × 每一格的移動成本）：沼澤、要拆的牆都會算進去
+func path_cost(path: PackedVector2Array) -> float:
+	var total: float = 0.0
+	for i: int in path.size() - 1:
+		total += path[i].distance_to(path[i + 1]) * cost_of(cell_of(path[i + 1]))
+	return total
+
+
 ## 兩個位置之間有沒有路（塔防放塔前檢查會不會把路堵死）
 func has_path(from: Vector2, to: Vector2) -> bool:
 	var path: PackedVector2Array = find_path(from, to)
@@ -206,18 +217,24 @@ func set_cost(cell: Vector2i, cost: float) -> void:
 ## 登記一個會變的障礙物（門）。節點要有：
 ##   屬性 blocks_path（bool）、path_cost（float）、signal obstacle_changed
 ## 放在 group「path_obstacles」的節點，setup() 時會自動登記，並對齊到格子中心
+## 打得壞的障礙物（牆）：再加上 is_broken（bool）、damage(傷害)，PathFollower 走到前面會停下來打
 func register_obstacle(node: Node2D) -> void:
 	if node == null:
 		return
 	var cell: Vector2i = cell_of(node.global_position)
 	node.global_position = cell_center(cell)
+	if not _obstacles.has(cell):
+		if _blocked.has(cell):
+			_under_blocked[cell] = _blocked[cell]
+		if _costs.has(cell):
+			_under_costs[cell] = _costs[cell]
 	_obstacles[cell] = node
 	if node.has_signal("obstacle_changed") and not node.is_connected("obstacle_changed", _on_obstacle_changed.bind(node)):
 		node.connect("obstacle_changed", _on_obstacle_changed.bind(node))
 	_apply_obstacle(cell, node)
 
 
-## 取消登記障礙物（例如陷阱消失了）：那一格回到 tile 原本的樣子
+## 取消登記障礙物（例如陷阱消失了、牆被打破了）：那一格回到登記之前的樣子
 func unregister_obstacle(node: Node2D) -> void:
 	var cell: Vector2i = cell_of(node.global_position)
 	if _obstacles.get(cell) != node:
@@ -225,6 +242,12 @@ func unregister_obstacle(node: Node2D) -> void:
 	_obstacles.erase(cell)
 	_blocked.erase(cell)
 	_costs.erase(cell)
+	if _under_blocked.has(cell):
+		_blocked[cell] = _under_blocked[cell]
+	if _under_costs.has(cell):
+		_costs[cell] = _under_costs[cell]
+	_under_blocked.erase(cell)
+	_under_costs.erase(cell)
 	if node.has_signal("obstacle_changed") and node.is_connected("obstacle_changed", _on_obstacle_changed.bind(node)):
 		node.disconnect("obstacle_changed", _on_obstacle_changed.bind(node))
 	_refresh_cell(cell)

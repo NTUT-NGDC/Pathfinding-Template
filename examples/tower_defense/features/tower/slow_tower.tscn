@@ -4,6 +4,7 @@
 [ext_resource type="PackedScene" path="res://examples/tower_defense/features/tower_traits/slow.tscn" id="2_trait"]
 
 [node name="SlowTower" instance=ExtResource("1_tower")]
+display_name = "緩速塔"
 cost = 6
 color = Color(0.45, 0.75, 0.95, 1)
 damage = 0.5

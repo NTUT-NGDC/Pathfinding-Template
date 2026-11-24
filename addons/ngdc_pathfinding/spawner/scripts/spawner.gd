@@ -149,7 +149,7 @@ func targets() -> Array[Node2D]:
 	return result
 
 
-## 從 from 出發，走哪個基地的路最短（會飛的怪 use_pathfinding 關掉 → 看直線距離）
+## 從 from 出發，走哪個基地的路成本最低（會飛的怪 use_pathfinding 關掉 → 看直線距離）
 func pick_target(from: Vector2, follower: PathFollower = null) -> Node2D:
 	var grid: PathGrid = get_tree().get_first_node_in_group("path_grid") as PathGrid
 	var best: Node2D = null
@@ -160,9 +160,7 @@ func pick_target(from: Vector2, follower: PathFollower = null) -> Node2D:
 			var path: PackedVector2Array = grid.find_path(from, node.global_position)
 			if path.is_empty() or grid.cell_of(path[path.size() - 1]) != grid.cell_of(node.global_position):
 				continue                                          # 走不到這個基地
-			length = 0.0
-			for i: int in path.size() - 1:
-				length += path[i].distance_to(path[i + 1])
+			length = grid.path_cost(path)                         # 沼澤、要拆的牆也算進去
 		if length < best_length:
 			best = node
 			best_length = length

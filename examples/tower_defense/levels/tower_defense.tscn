@@ -77,6 +77,7 @@ tile_set = ExtResource("1_af8b6")
 [node name="PathGrid" parent="." unique_id=1200461479 node_paths=PackedStringArray("walls", "floor_layer") instance=ExtResource("2_ray8a")]
 walls = NodePath("../Walls")
 floor_layer = NodePath("../Floor")
+diagonal = 0
 
 [node name="Spawner" parent="." unique_id=583726812 instance=ExtResource("4_qquge")]
 position = Vector2(48, 272)
@@ -124,7 +125,7 @@ layout_mode = 2
 theme_override_font_sizes/font_size = 11
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 4
-text = "左鍵蓋、右鍵拆（退一半）　WASD／滑鼠到邊緣移動、滾輪縮放　滑鼠移到塔上看射程"
+text = "左鍵蓋、點塔升級、右鍵拆（退一半）　WASD／滑鼠到邊緣移動、滾輪縮放　滑鼠移到塔上看射程和升級價格"
 
 [node name="BuildBar" parent="HUD" unique_id=1560067763 instance=ExtResource("27_nprd4")]
 offset_left = 64.0

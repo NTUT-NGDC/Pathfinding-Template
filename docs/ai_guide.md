@@ -65,8 +65,8 @@ game_config.tres   遊戲名稱、開始場景、Credits 名單
 
 | 積木 | 怎麼用 |
 | --- | --- |
-| 尋路地圖 `PathGrid` | 場景裡放一個，指定牆／地板的 TileMapLayer；`find_path()`、`set_blocked()`、`would_block()`、`set_cost()`；group `path_grid` |
-| 跟著路徑走 `PathFollower` | 放在角色底下，`go_to(位置)`、`follow(節點)`、`stop()`；地圖變了自動改路 |
+| 尋路地圖 `PathGrid` | 場景裡放一個，指定牆／地板的 TileMapLayer；`find_path()`、`set_blocked()`、`would_block()`、`set_cost()`、`register_obstacle()`（門、打得壞的牆）；group `path_grid` |
+| 跟著路徑走 `PathFollower` | 放在角色底下，`go_to(位置)`、`follow(節點)`、`stop()`、`remaining_distance()`（還有多遠到終點）；地圖變了自動改路 |
 | 視野 `VisionSensor` | 距離 → 角度 → 射線；`target_seen`／`target_lost`、`sees_target` |
 | 聲音 `SoundBus`＋耳朵 `Ear` | `SoundBus.emit_sound(位置, 範圍)`；Ear 發 `heard(position)` |
 | 追逐 AI `ChaseAI` | 巡邏、查看、懷疑、追擊、搜尋；Marker2D 子節點當巡邏點；`caught(target)` |
@@ -82,7 +82,7 @@ game_config.tres   遊戲名稱、開始場景、Credits 名單
 | 範例 | 用到的積木 | 可以改成 |
 | --- | --- | --- |
 | `examples/chase/`：在房子裡拿東西、修發電機逃出去，被追逐 AI 追；有捕獸夾（AI 追丟會放）、警報、可以丟的瓶子（出口條件看「目標」接口：group `objectives`＋`required`／`is_done`／`category`＋`completed`，說明在範例 README） | 尋路地圖、追逐 AI、視野、聲音 | 潛行、恐怖逃脫、小精靈、外送 |
-| `examples/tower_defense/`：點格子放牆／塔，怪即時改路；地圖用地圖編輯器畫（`map_editor/`，存在 `maps/`，出怪口、基地可以好幾個，基地規則看 `BaseGroup`；地形有岩石、沼澤、高地，地圖裡勾哪種地面可以蓋塔、蓋牆（`TDMap.tower_ground`、`wall_ground`：迷宮型蓋空地、固定路線型只蓋高地）；試玩在編輯器裡直接玩）；怪物掛件（`enemy_traits/`：加速、厚血、裝甲、會飛、分裂、治療）、砲塔掛件（`tower_traits/`：緩速、範圍、多重射擊）拖到怪或塔底下就生效 | 尋路地圖、生怪器、跟著路徑走 | 塔防、殭屍圍城、路網規劃 |
+| `examples/tower_defense/`：點格子放牆／塔，怪即時改路；牆可以被怪打破（`TDWall`：Breakable、Max Health、Break Cost，A* 比較要繞路還是拆）；左鍵點塔升級（塔的檢查器「升級」）；地圖用地圖編輯器畫（`map_editor/`，存在 `maps/`，出怪口、基地可以好幾個，基地規則看 `BaseGroup`；地形有岩石、沼澤、高地，地圖裡勾哪種地面可以蓋塔、蓋牆（`TDMap.tower_ground`、`wall_ground`：迷宮型蓋空地、固定路線型只蓋高地）；試玩在編輯器裡直接玩）；怪物掛件（`enemy_traits/`：加速、厚血、裝甲、會飛、分裂、治療）、砲塔掛件（`tower_traits/`：緩速、範圍、多重射擊）拖到怪或塔底下就生效 | 尋路地圖、生怪器、跟著路徑走 | 塔防、殭屍圍城、路網規劃 |
 | `examples/tactics/`：點角色看移動範圍、點格子走過去 | 尋路地圖、移動範圍、跟著路徑走 | 戰棋、自走棋、小隊指揮、經營 |
 
 ### 已經設定好的按鍵（`project.godot`，不用再加）

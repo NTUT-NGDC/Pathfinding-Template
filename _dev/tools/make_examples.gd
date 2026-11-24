@@ -186,7 +186,7 @@ func _build_tower_defense() -> Node2D:
 			floor_layer.set_cell(Vector2i(x, y), 0, Vector2i(0, 0))
 	var walls: TileMapLayer = _add(TileMapLayer.new(), "Walls", _root)
 	walls.tile_set = tileset
-	_add_grid([floor_layer, walls], 1)
+	_add_grid([floor_layer, walls], 0)                            # 不斜走：打得壞的牆算「可以走」，斜走會從斜放的兩面牆中間鑽過去
 	var counts: Dictionary[String, int] = {}
 	var spawner: Spawner = _instance("res://addons/ngdc_pathfinding/spawner/spawner.tscn", "Spawner", map.cell_center(map.spawn_cells[0]), counts)
 	spawner.lose_when_reached = false                             # 基地有血量，扣光才輸（看 BaseGroup）
@@ -219,7 +219,7 @@ func _build_tower_defense() -> Node2D:
 	money.set("score", 12)
 	var wave_label: Node = _instance_ui("res://examples/tower_defense/features/hud/wave_label.tscn", "WaveLabel", box)
 	_instance_ui("res://examples/tower_defense/features/hud/base_label.tscn", "BaseLabel", box)
-	_hint(box, "左鍵蓋、右鍵拆（退一半）　WASD／滑鼠到邊緣移動、滾輪縮放　滑鼠移到塔上看射程")
+	_hint(box, "左鍵蓋、點塔升級、右鍵拆（退一半）　WASD／滑鼠到邊緣移動、滾輪縮放　滑鼠移到塔上看射程和升級價格")
 	var bar: Control = _instance_ui("res://examples/tower_defense/features/hud/build_bar.tscn", "BuildBar", hud)
 	bar.position = Vector2(64, 616)
 	var speed_button: Control = _instance_ui("res://examples/tower_defense/features/hud/speed_button.tscn", "SpeedButton", hud)

@@ -1,6 +1,6 @@
 extends HBoxContainer
 ## 畫面下方的「要蓋什麼」按鈕：牆、塔、緩速塔……（跟著 Builder 的設定自動產生；不能蓋牆就沒有牆）。
-## 前三個也可以按鍵 1、2、3 選。
+## 前九個也可以按數字鍵 1～9 選。
 
 
 var _buttons: Dictionary[int, Button] = {}
@@ -31,7 +31,7 @@ func _rebuild() -> void:
 		var button: Button = Button.new()
 		button.toggle_mode = true
 		button.focus_mode = Control.FOCUS_NONE
-		button.text = ("%d " % (i + 1) if i < 3 else "") + _builder.option_label(what)
+		button.text = ("%d " % (i + 1) if i < Builder.MAX_KEYS else "") + _builder.option_label(what)
 		button.pressed.connect(func() -> void: _builder.selected = what)
 		add_child(button)
 		_buttons[what] = button

@@ -1,0 +1,11 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://examples/tower_defense/features/tower/tower.tscn" id="1_tower"]
+[ext_resource type="PackedScene" path="res://examples/tower_defense/features/tower_traits/multi_shot.tscn" id="2_trait"]
+
+[node name="MultiTower" instance=ExtResource("1_tower")]
+display_name = "連射塔"
+cost = 10
+color = Color(0.7, 0.5, 0.9, 1)
+
+[node name="MultiShot" parent="." instance=ExtResource("2_trait")]

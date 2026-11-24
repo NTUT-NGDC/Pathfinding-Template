@@ -1,7 +1,9 @@
 class_name Builder
 extends Node2D
-## 蓋東西：下面的按鈕（或按 1、2、3）選要蓋什麼，滑鼠左鍵點格子蓋下去，右鍵拆掉（退一半的錢）。
-## 蓋在空地、沼澤上的牆和塔會擋路，怪物會即時改路；但不能把路完全堵死。
+## 蓋東西：下面的按鈕（或按數字鍵 1～9）選要蓋什麼，滑鼠左鍵點格子蓋下去，右鍵拆掉（退一半的錢）。
+## 左鍵點蓋好的塔＝升級。
+## 蓋在空地、沼澤上的塔會擋路，怪物會即時改路；但塔不能把路完全堵死。
+## 牆（block.tscn）可以被怪打破：怪會比較要繞路還是拆牆，所以可以用牆把路堵死。
 ## 高地、岩石本來就不能走，蓋在上面不影響怪的路。
 ## 蓋不了的格子會變紅，旁邊寫原因（會把路堵死、錢不夠……）。選塔的時候會先畫出射程。
 ##
@@ -14,6 +16,8 @@ extends Node2D
 ## 想多一種塔就把塔的場景加進 Tower Scenes。
 ## 不能堵死的規則：每個出怪口都要還走得到至少一個基地。
 
+## 塔升級了
+signal tower_upgraded(tower: Tower)
 ## 蓋了一個東西（what：0＝牆，1 以後＝Tower Scenes 的第幾種塔＋1）
 signal built(cell: Vector2i, what: int)
 ## 選的東西變了
@@ -21,8 +25,11 @@ signal selection_changed(what: int)
 ## 規則變了（能不能蓋牆……）：下面的按鈕要重做
 signal rules_changed()
 
-const WALL_SCENE: PackedScene = preload("res://examples/tower_defense/features/builder/block.tscn")
+## 前幾種可以用數字鍵選
+const MAX_KEYS: int = 9
 
+## 牆（血量、拆牆等於多走幾格、可不可以被破壞，在牆自己的檢查器改）
+@export var wall_scene: PackedScene = preload("res://examples/tower_defense/features/builder/block.tscn")
 ## 牆多少錢
 @export_range(0, 100, 1) var wall_cost: int = 1
 ## 可以蓋的塔（價錢、射程在塔自己的檢查器改）
@@ -30,6 +37,7 @@ const WALL_SCENE: PackedScene = preload("res://examples/tower_defense/features/b
 	preload("res://examples/tower_defense/features/tower/tower.tscn"),
 	preload("res://examples/tower_defense/features/tower/slow_tower.tscn"),
 	preload("res://examples/tower_defense/features/tower/splash_tower.tscn"),
+	preload("res://examples/tower_defense/features/tower/multi_tower.tscn"),
 ]
 
 ## 哪些地面可以蓋塔：TDMap.Ground 的 flags（地圖決定，用 set_rules() 改）
@@ -50,6 +58,8 @@ var _money: ScoreDisplay
 var _block_cache: Dictionary[Vector2i, bool] = {}
 ## 每種塔的樣本（讀價錢、射程、名字用，不放進場景）
 var _samples: Array[Tower] = []
+## 牆的樣本（看牆可不可以被破壞）
+var _wall_sample: TDWall
 ## 剛剛點了蓋不了的地方：在那裡顯示原因
 var _message: String = ""
 var _message_at: Vector2
@@ -64,33 +74,92 @@ func _ready() -> void:
 	z_index = 3
 	for scene: PackedScene in tower_scenes:
 		_samples.append(scene.instantiate() as Tower)
+	_wall_sample = wall_scene.instantiate() as TDWall
 
 
 func _exit_tree() -> void:
 	for sample: Tower in _samples:
 		if is_instance_valid(sample):
 			sample.free()
+	if is_instance_valid(_wall_sample):
+		_wall_sample.free()
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	var choices: Array[int] = options()
-	for i: int in mini(3, choices.size()):
-		if event.is_action_pressed("skill_%d" % (i + 1)):
+	var key: InputEventKey = event as InputEventKey
+	for i: int in mini(MAX_KEYS, choices.size()):
+		var action: String = "skill_%d" % (i + 1)                 # 1～3 用起手包的按鍵，4～9 直接看數字鍵
+		var pressed: bool = event.is_action_pressed(action) if InputMap.has_action(action) \
+				else key != null and key.pressed and not key.echo and key.physical_keycode == KEY_1 + i
+		if pressed:
 			selected = choices[i]
 	var button: InputEventMouseButton = event as InputEventMouseButton
 	if button == null or not button.pressed or not _ready_to_build():
 		return
 	var cell: Vector2i = _grid.cell_of(to_global((make_input_local(button) as InputEventMouseButton).position))
 	if button.button_index == MOUSE_BUTTON_LEFT:
-		if not build(cell):
-			_message = why_not(cell)                              # 蓋不了：在那裡顯示原因
-			_message_at = _grid.cell_center(cell)
-			_message_time = 1.5
+		var tower: Tower = tower_at(cell)
+		if tower != null:
+			_say(cell, "升到 Lv%d" % tower.level if upgrade(cell) else why_not_upgrade(cell))
+		elif not build(cell):
+			_say(cell, why_not(cell))                             # 蓋不了：在那裡顯示原因
 	elif button.button_index == MOUSE_BUTTON_RIGHT:
 		remove(cell)
 	else:
 		return
 	get_viewport().set_input_as_handled()
+
+
+## 在 cell 上面顯示一下文字
+func _say(cell: Vector2i, text: String) -> void:
+	_message = text
+	_message_at = _grid.cell_center(cell)
+	_message_time = 1.5
+
+
+## cell 上的塔（沒有就是 null）
+func tower_at(cell: Vector2i) -> Tower:
+	return buildings.get(cell) as Tower
+
+
+## 把 cell 上的塔升一級；不能升回傳 false
+func upgrade(cell: Vector2i) -> bool:
+	if not _ready_to_build() or not why_not_upgrade(cell).is_empty():
+		return false
+	var tower: Tower = tower_at(cell)
+	_money.add(-tower.upgrade_cost())
+	tower.upgrade()
+	tower_upgraded.emit(tower)
+	return true
+
+
+## 為什麼不能升級（可以升＝空字串）
+func why_not_upgrade(cell: Vector2i) -> String:
+	var tower: Tower = tower_at(cell)
+	if tower == null:
+		return "這裡沒有塔"
+	if tower.max_level <= 1:
+		return "這種塔不能升級"
+	if not tower.can_upgrade():
+		return "已經滿級（Lv%d）" % tower.level
+	if _money.score < tower.upgrade_cost():
+		return "錢不夠（升級要 %d 元）" % tower.upgrade_cost()
+	return ""
+
+
+## 滑鼠移到蓋好的東西上：等級、升級價格；受傷的牆顯示血量
+func building_text(cell: Vector2i) -> String:
+	var wall: TDWall = buildings.get(cell) as TDWall
+	if wall != null:
+		return "牆 %d/%d" % [ceili(wall.health), ceili(wall.max_health)] if wall.breakable else "牆（打不壞）"
+	var tower: Tower = tower_at(cell)
+	if tower == null:
+		return ""
+	if not tower.can_upgrade():
+		return why_not_upgrade(cell)
+	var text: String = "Lv%d → Lv%d　%d 元" % [tower.level, tower.level + 1, tower.upgrade_cost()]
+	return text if why_not_upgrade(cell).is_empty() else text + "（錢不夠）"
 
 
 ## 換規則（MapLoader 讀地圖時呼叫）
@@ -127,15 +196,17 @@ func option_label(what: int) -> String:
 	if what == 0:
 		return "牆 %d 元" % wall_cost
 	var sample: Tower = _samples[what - 1]
-	return "%s %d 元" % [_tower_name(sample), sample.cost]
+	return "%s %d 元" % [_tower_name(what), sample.cost]
 
 
-func _tower_name(tower: Tower) -> String:
-	match tower.name:
-		"SlowTower": return "緩速塔"
-		"SplashTower": return "範圍塔"
-		"Tower": return "塔"
-	return tower.name
+## 塔的名字（塔自己的 Display Name；跟前面的塔同名就加號碼，才分得出來）
+func _tower_name(what: int) -> String:
+	var text: String = _samples[what - 1].display_name
+	var same: int = 1
+	for i: int in what - 1:
+		if _samples[i].display_name == text:
+			same += 1
+	return text if same == 1 else "%s%d" % [text, same]
 
 
 ## 第幾種的價錢
@@ -147,29 +218,51 @@ func cost_of(what: int) -> int:
 func build(cell: Vector2i) -> bool:
 	if not _ready_to_build() or not can_build(cell):
 		return false
-	var node: Node2D = (WALL_SCENE if selected == 0 else tower_scenes[selected - 1]).instantiate()
+	var node: Node2D = (wall_scene if selected == 0 else tower_scenes[selected - 1]).instantiate()
 	get_parent().add_child(node)
 	node.global_position = _grid.cell_center(cell)                # 先加進場景再設位置（反過來會多算關卡的偏移）
 	buildings[cell] = node
 	_money.add(-cost_of(selected))
 	node.add_to_group("buildings")
-	if TDMap.is_walkable_ground(ground_at(cell)):
-		_grid.set_blocked(cell, true)                             # 空地、沼澤：擋路，怪會即時改路（高地、岩石本來就擋路）
+	if node is TDWall:
+		(node as TDWall).broken.connect(_on_wall_broken.bind(cell))
+	if TDMap.is_walkable_ground(ground_at(cell)):                 # 空地、沼澤：怪會即時改路（高地、岩石本來就擋路）
+		if node is TDWall:
+			_grid.register_obstacle(node)                         # 牆：登記成障礙物（打得壞的話走得過去但很貴）
+			_grid.map_changed.emit()
+		else:
+			_grid.set_blocked(cell, true)                         # 塔：不能走
 	built.emit(cell, selected)
 	return true
 
 
-## 拆掉 cell 上的東西，退一半的錢
+## 拆掉 cell 上的東西，退一半的錢（塔：蓋和升級花的都算；牆：照剩下的血量）
 func remove(cell: Vector2i) -> bool:
 	if not buildings.has(cell):
 		return false
 	var node: Node2D = buildings[cell]
-	_money.add(int(((node as Tower).cost if node is Tower else wall_cost) / 2.0))
-	node.queue_free()
-	buildings.erase(cell)
-	if TDMap.is_walkable_ground(ground_at(cell)):
-		_grid.clear_blocked(cell)                                 # 空地、沼澤：又可以走了（高地、岩石維持不能走）
+	var wall: TDWall = node as TDWall
+	_money.add(int((node as Tower).spent / 2.0 if node is Tower else wall_cost * wall.health_ratio() / 2.0))
+	_take_away(cell)
 	return true
+
+
+## 把 cell 上的東西拿掉，尋路地圖變回原本的樣子（高地、岩石維持不能走）
+func _take_away(cell: Vector2i) -> void:
+	var node: Node2D = buildings[cell]
+	var walkable: bool = TDMap.is_walkable_ground(ground_at(cell))
+	buildings.erase(cell)
+	if walkable and node is TDWall:
+		_grid.unregister_obstacle(node)
+	elif walkable:
+		_grid.clear_blocked(cell)
+	node.queue_free()
+
+
+## 牆被怪打破了（不退錢）
+func _on_wall_broken(cell: Vector2i) -> void:
+	if buildings.has(cell) and _ready_grid():
+		_take_away(cell)
 
 
 ## 這一格能不能蓋現在選的東西
@@ -200,6 +293,8 @@ func why_not(cell: Vector2i) -> String:
 	for enemy: Node in get_tree().get_nodes_in_group("enemies"):
 		if _grid.cell_of((enemy as Node2D).global_position) == cell:
 			return "有怪站在上面"
+	if is_wall and _wall_sample.breakable:
+		return ""                                                 # 打得壞的牆：堵死也沒關係，怪會拆
 	if not _block_cache.has(cell):
 		_block_cache[cell] = would_block(cell, starts, goals)
 	if _block_cache[cell]:
@@ -259,13 +354,17 @@ func goal_points() -> Array[Node2D]:
 
 
 func _ready_to_build() -> bool:
+	if _money == null or not is_instance_valid(_money):
+		_money = get_tree().get_first_node_in_group("score") as ScoreDisplay
+	return _ready_grid() and _money != null and not GameFlow.is_finished()
+
+
+func _ready_grid() -> bool:
 	if _grid == null or not is_instance_valid(_grid):
 		_grid = get_tree().get_first_node_in_group("path_grid") as PathGrid
 		if _grid != null:
 			_grid.map_changed.connect(func() -> void: _block_cache.clear())   # 地圖變了：堵不堵死要重算
-	if _money == null or not is_instance_valid(_money):
-		_money = get_tree().get_first_node_in_group("score") as ScoreDisplay
-	return _grid != null and _money != null and not GameFlow.is_finished()
+	return _grid != null
 
 
 func _process(delta: float) -> void:
@@ -280,9 +379,13 @@ func _draw() -> void:
 	if _message_time > 0.0:
 		_draw_text(to_local(_message_at) + Vector2(-60, -24), _message, Color(1, 0.75, 0.6, minf(_message_time, 1.0)))
 	var cell: Vector2i = _grid.cell_of(get_global_mouse_position())
-	if not _grid.astar.is_in_boundsv(cell) or buildings.has(cell):
+	if not _grid.astar.is_in_boundsv(cell):
 		return
 	var center: Vector2 = to_local(_grid.cell_center(cell))
+	if buildings.has(cell):
+		if _message_time <= 0.0:
+			_draw_text(center + Vector2(20, -20), building_text(cell), Color(1, 0.9, 0.6))   # 等級、升級價格、牆的血量
+		return
 	var rect: Rect2 = Rect2(center - _grid.cell_size() / 2.0, _grid.cell_size())
 	var reason: String = why_not(cell)
 	var ok: bool = reason.is_empty()

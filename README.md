@@ -31,7 +31,7 @@
 | 範例 | 玩法 | 可以改成 |
 | --- | --- | --- |
 | [追逐](examples/chase/README.md) | 在房子裡撿齊寶物逃出去，追逐 AI 會看、會聽、會繞路追你 | 潛行、恐怖逃脫、小精靈、外送 |
-| [塔防](examples/tower_defense/README.md) | 用牆和塔排迷宮，怪即時改路；不能把路堵死 | 殭屍圍城、路網規劃 |
+| [塔防](examples/tower_defense/README.md) | 用牆和塔排迷宮，怪即時改路，繞太遠就拆牆 | 殭屍圍城、路網規劃 |
 | [戰棋](examples/tactics/README.md) | 點棋子看移動範圍、點格子走過去，輪流行動 | 自走棋、小隊指揮、經營 |
 
 每個範例的 README 都寫了「**不寫程式可以改什麼**」。

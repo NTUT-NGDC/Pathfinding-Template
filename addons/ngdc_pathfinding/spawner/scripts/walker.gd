@@ -18,6 +18,8 @@ signal died(walker: Walker)
 			_follower().speed = value
 ## 血量
 @export_range(1, 1000, 1) var max_health: float = 10.0
+## 打牆的力氣：每秒扣打得壞的牆幾滴血
+@export_range(0.1, 100.0, 0.1) var wall_damage: float = 1.0
 ## 打死給幾分（場景裡有起手包的分數 ScoreDisplay 的話會自動加）
 @export_range(0, 1000, 1) var score: int = 1
 ## 顏色
@@ -45,6 +47,7 @@ func _ready() -> void:
 		return
 	add_to_group("enemies")
 	_follower().speed = speed
+	_follower().break_power = wall_damage
 
 
 func _process(delta: float) -> void:

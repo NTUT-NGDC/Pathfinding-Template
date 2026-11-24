@@ -4,8 +4,10 @@
 [ext_resource type="PackedScene" path="res://examples/tower_defense/features/tower_traits/splash.tscn" id="2_trait"]
 
 [node name="SplashTower" instance=ExtResource("1_tower")]
-cost = 8
+display_name = "範圍塔"
+cost = 6
 color = Color(0.9, 0.55, 0.25, 1)
 fire_interval = 1.0
 
 [node name="Splash" parent="." instance=ExtResource("2_trait")]
+splash_ratio = 0.75
