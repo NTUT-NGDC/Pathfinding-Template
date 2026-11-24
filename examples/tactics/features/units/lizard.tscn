@@ -1,0 +1,15 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://examples/tactics/features/unit/unit.tscn" id="1_unit"]
+[ext_resource type="PackedScene" path="res://examples/tactics/features/unit_traits/swamp_walker.tscn" id="2_swamp_walker"]
+
+[node name="Lizard" instance=ExtResource("1_unit")]
+display_name = "蜥蜴人"
+mark = "蜥"
+color = Color(0.498, 0.6902, 0.4157, 1)
+max_health = 20
+attack = 6
+defense = 1
+speed = 6
+
+[node name="SwampWalker" parent="." instance=ExtResource("2_swamp_walker")]

@@ -1,0 +1,16 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://examples/tactics/features/unit/unit.tscn" id="1_unit"]
+[ext_resource type="PackedScene" path="res://examples/tactics/features/unit_traits/knockback.tscn" id="2_knockback"]
+
+[node name="Hammer" instance=ExtResource("1_unit")]
+display_name = "大槌兵"
+mark = "槌"
+color = Color(0.7529, 0.4392, 0.3529, 1)
+max_health = 26
+attack = 8
+defense = 2
+move_points = 3
+speed = 4
+
+[node name="Knockback" parent="." instance=ExtResource("2_knockback")]

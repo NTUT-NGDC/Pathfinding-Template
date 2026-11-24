@@ -3,6 +3,7 @@ extends Node2D
 ## 跟著路徑走：放在任何角色（Node2D、CharacterBody2D）底下，給目標它就會繞路走過去。
 ##   go_to(位置)：走到一個固定的點
 ##   follow(節點)：一直追著某個節點（每隔「重算間隔」秒重算一次路，例如追玩家）
+##   walk(路)：照你給的路走，不自己找路（例如戰棋照移動範圍算好的路走）
 ##   stop()：停下來
 ## 地圖變了（放了牆、門打開）會自動重算路徑。
 ## 遇到關著的門（有 open() 的障礙物）會停下來，等「開門要幾秒」再打開。
@@ -44,6 +45,8 @@ var _grid: PathGrid
 var _target_point: Vector2
 var _target_node: Node2D
 var _has_target: bool = false
+## 照指定的路走（walk()），不要自己重新找路
+var _fixed_path: bool = false
 var _repath_timer: float = 0.0
 var _door: Node2D
 var _door_timer: float = 0.0
@@ -63,6 +66,7 @@ func go_to(target: Vector2) -> void:
 	_target_node = null
 	_target_point = target
 	_has_target = true
+	_fixed_path = false
 	_repath()
 
 
@@ -70,7 +74,17 @@ func go_to(target: Vector2) -> void:
 func follow(target: Node2D) -> void:
 	_target_node = target
 	_has_target = true
+	_fixed_path = false
 	_repath()
+
+
+## 照指定的路走（全局座標），走完發 arrived
+func walk(points: PackedVector2Array) -> void:
+	_target_node = null
+	_has_target = true
+	_fixed_path = true
+	_door = null
+	path = points.duplicate()
 
 
 ## 停下來
@@ -197,7 +211,7 @@ func _make_path(target: Vector2) -> PackedVector2Array:
 
 ## 下一個點是關著的門（或打得壞的東西）、而且已經走到前面 → 開始開門（打它）
 func _start_opening_door(next_point: Vector2) -> bool:
-	if _grid == null or not use_pathfinding:
+	if _grid == null or not use_pathfinding or _fixed_path:
 		return false
 	var door: Node2D = _grid.obstacle_at(_grid.cell_of(next_point))
 	if door == null:
@@ -244,7 +258,7 @@ func _connect_grid() -> void:
 func _on_map_changed() -> void:
 	if not is_instance_valid(_door) or not _door.has_method("open"):
 		_door = null                                              # 在打牆：地圖變了就重新想要繞路還是繼續打（牆扣的血會留著）
-	if _has_target and _door == null:
+	if _has_target and _door == null and not _fixed_path:
 		_repath()
 
 

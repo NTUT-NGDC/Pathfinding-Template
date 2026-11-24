@@ -67,11 +67,11 @@ game_config.tres   遊戲名稱、關卡（Levels）、Credits 名單
 | 積木 | 怎麼用 |
 | --- | --- |
 | 尋路地圖 `PathGrid` | 場景裡放一個，指定牆／地板的 TileMapLayer；`find_path()`、`set_blocked()`、`would_block()`、`set_cost()`、`register_obstacle()`（門、打得壞的牆）；group `path_grid` |
-| 跟著路徑走 `PathFollower` | 放在角色底下，`go_to(位置)`、`follow(節點)`、`stop()`、`remaining_distance()`（還有多遠到終點）；地圖變了自動改路 |
+| 跟著路徑走 `PathFollower` | 放在角色底下，`go_to(位置)`、`follow(節點)`、`walk(路)`（照指定的路走）、`stop()`、`remaining_distance()`（還有多遠到終點）；地圖變了自動改路 |
 | 視野 `VisionSensor` | 距離 → 角度 → 射線；`target_seen`／`target_lost`、`sees_target` |
 | 聲音 `SoundBus`＋耳朵 `Ear` | `SoundBus.emit_sound(位置, 範圍)`；Ear 發 `heard(position)` |
 | 追逐 AI `ChaseAI` | 巡邏、查看、懷疑、追擊、搜尋；Marker2D 子節點當巡邏點；`caught(target)` |
-| 移動範圍 `MoveRange` | `show_from(位置, 移動力)`、`tile_selected(cell)` |
+| 移動範圍 `MoveRange` | `show_from(位置, 移動力)`、`reachable_cells()`、`path_to(cell)`、`tile_selected(cell)`；每個角色的規則不一樣用 `cost_rule`、`stop_rule` |
 | 點擊移動 `ClickMover` | 點選／框選 group「units」的角色，點地圖就走 |
 | 生怪器 `Spawner`＋小怪 `Walker` | 波次表（`Wave` 資源）、目標；`reached_goal`、`all_cleared` |
 | 除錯顯示 `PathDebug` | 遊戲中按 F1～F5 |
@@ -84,7 +84,7 @@ game_config.tres   遊戲名稱、關卡（Levels）、Credits 名單
 | --- | --- | --- |
 | `examples/chase/`：在房子裡拿東西、修發電機逃出去，被追逐 AI 追；有捕獸夾（AI 追丟會放）、警報、可以丟的瓶子（出口條件看「目標」接口：group `objectives`＋`required`／`is_done`／`category`＋`completed`，說明在範例 README） | 尋路地圖、追逐 AI、視野、聲音 | 潛行、恐怖逃脫、小精靈、外送 |
 | `examples/tower_defense/`：點格子放牆／塔，怪即時改路；牆可以被怪打破（`TDWall`：Breakable、Max Health、Break Cost，A* 比較要繞路還是拆）；左鍵點塔升級（塔的檢查器「升級」）；地圖、波次、怪物都用編輯器做（`map_editor/`：地圖存 `maps/`、波次存 `waves/`（`WaveTable`）、怪物存 `features/enemies/`；出怪口、基地可以好幾個，基地規則看 `BaseGroup`；地形有岩石、沼澤、高地，地圖裡勾哪種地面可以蓋塔、蓋牆（`TDMap.tower_ground`、`wall_ground`：迷宮型蓋空地、固定路線型只蓋高地）；試玩在編輯器裡直接玩）；怪物掛件（`enemy_traits/`：加速、厚血、裝甲、會飛、分裂、治療）、砲塔掛件（`tower_traits/`：緩速、範圍、多重射擊）拖到怪或塔底下就生效 | 尋路地圖、生怪器、跟著路徑走 | 塔防、殭屍圍城、路網規劃 |
-| `examples/tactics/`：點角色看移動範圍、點格子走過去 | 尋路地圖、移動範圍、跟著路徑走 | 戰棋、自走棋、小隊指揮、經營 |
+| `examples/tactics/`：探索（`TacticsParty` WASD 或左鍵 `walk_to()` 帶隊，`control()` 換人、`set_split()` 整隊／分開、`TacticsFormation` 陣形、出發前 `TacticsPartySetup` 編隊、隊伍池 `TacticsPool`（起始隊伍 `party_pool.tres`＋招募 `TacticsAlly`＋過關獎勵，玩家有誰用 `TacticsPool.units()`）、`EnemySquad` 隊形巡邏＋每隻視野、偷襲、營地物資紮營、寶箱 `TacticsChest`、小隊掉落）→ 布陣 → 戰鬥（`TacticsBattle`：照速度輪流，`auto` 自動／回合制隨時切換、倍速、暫停；電腦是 `BattleAI`；`set_focus()` 指定目標、`intents` 每隻打算做什麼、`note()` 日誌、`dice` 骰子）；棋子 `Unit`＋特性 `UnitTrait`（`unit_traits/` 拖到棋子底下：飛行、沼澤行者、攔截、突擊、反擊、治療、範圍、擊退、守護、吸血），做好的職業在 `units/`；地圖（`TacticsMap`：地形用 `paint*()` 畫圓滑的或對齊格子，`kind_at()` 看格子中心；小隊、隊伍、規則）用 `map_editor/` 做，存 `maps/`。做純戰棋：小隊勾「一開始就開打」 | 尋路地圖、移動範圍、跟著路徑走、視野 | 戰棋、自走棋、潛行、小隊指揮 |
 
 ### 已經設定好的按鍵（`project.godot`，不用再加）
 

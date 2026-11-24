@@ -1,0 +1,19 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://examples/tactics/features/unit/unit.tscn" id="1_unit"]
+[ext_resource type="PackedScene" path="res://examples/tactics/features/unit_traits/guard.tscn" id="2_guard"]
+[ext_resource type="PackedScene" path="res://examples/tactics/features/unit_traits/intercept.tscn" id="3_intercept"]
+
+[node name="Knight" instance=ExtResource("1_unit")]
+display_name = "重裝兵"
+mark = "盾"
+color = Color(0.6039, 0.6431, 0.7098, 1)
+max_health = 30
+attack = 7
+defense = 4
+move_points = 3
+speed = 3
+
+[node name="Guard" parent="." instance=ExtResource("2_guard")]
+
+[node name="Intercept" parent="." instance=ExtResource("3_intercept")]

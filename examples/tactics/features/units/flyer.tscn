@@ -1,0 +1,16 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://examples/tactics/features/unit/unit.tscn" id="1_unit"]
+[ext_resource type="PackedScene" path="res://examples/tactics/features/unit_traits/flying.tscn" id="2_flying"]
+
+[node name="Flyer" instance=ExtResource("1_unit")]
+display_name = "飛行兵"
+mark = "飛"
+color = Color(0.5412, 0.8314, 0.8784, 1)
+max_health = 18
+attack = 6
+defense = 1
+move_points = 6
+speed = 9
+
+[node name="Flying" parent="." instance=ExtResource("2_flying")]

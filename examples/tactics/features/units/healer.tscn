@@ -1,0 +1,17 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://examples/tactics/features/unit/unit.tscn" id="1_unit"]
+[ext_resource type="PackedScene" path="res://examples/tactics/features/unit_traits/healer.tscn" id="2_healer"]
+
+[node name="Healer" instance=ExtResource("1_unit")]
+display_name = "補師"
+mark = "醫"
+color = Color(0.949, 0.949, 0.949, 1)
+max_health = 16
+attack = 4
+defense = 0
+max_range = 2
+speed = 5
+mind = 3
+
+[node name="Healer" parent="." instance=ExtResource("2_healer")]

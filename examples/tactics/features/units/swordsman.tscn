@@ -1,0 +1,15 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://examples/tactics/features/unit/unit.tscn" id="1_unit"]
+[ext_resource type="PackedScene" path="res://examples/tactics/features/unit_traits/counter.tscn" id="2_counter"]
+
+[node name="Swordsman" instance=ExtResource("1_unit")]
+display_name = "劍士"
+mark = "劍"
+color = Color(0.902, 0.8275, 0.6588, 1)
+max_health = 24
+attack = 7
+defense = 2
+speed = 6
+
+[node name="Counter" parent="." instance=ExtResource("2_counter")]

@@ -1,0 +1,15 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://examples/tactics/features/unit/unit.tscn" id="1_unit"]
+
+[node name="Archer" instance=ExtResource("1_unit")]
+display_name = "弓箭手"
+mark = "弓"
+color = Color(0.7176, 0.8314, 0.5412, 1)
+max_health = 16
+attack = 7
+defense = 0
+min_range = 2
+max_range = 3
+speed = 7
+mind = 3

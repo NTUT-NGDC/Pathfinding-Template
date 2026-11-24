@@ -1,0 +1,7 @@
+[gd_resource type="Resource" script_class="TacticsPool" format=3]
+
+[ext_resource type="Script" path="res://examples/tactics/features/party_pool/scripts/tactics_pool.gd" id="1_pool"]
+
+[resource]
+script = ExtResource("1_pool")
+start = Array[String](["res://examples/tactics/features/units/swordsman.tscn", "res://examples/tactics/features/units/archer.tscn", "res://examples/tactics/features/units/flyer.tscn", "res://examples/tactics/features/units/healer.tscn", "res://examples/tactics/features/units/cavalry.tscn", "res://examples/tactics/features/units/knight.tscn"])

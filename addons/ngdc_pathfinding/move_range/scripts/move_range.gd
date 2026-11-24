@@ -25,12 +25,19 @@ signal cancelled()
 ## 打勾：滑鼠左鍵點格子會發出 tile_selected（關掉的話只畫，不接收點擊）
 @export var clickable: bool = true
 
+## 每個角色自己的規則（可以不放）：cost_rule.call(從哪格, 到哪格) → 走進去要花多少，負數＝不能走。
+## 有放的話連牆的格子都會問（例如會飛的角色可以過牆）
+var cost_rule: Callable = Callable()
+## 走到這一格就得停下來嗎（可以不放）：stop_rule.call(格子) → true＝停
+var stop_rule: Callable = Callable()
 ## 現在亮起來的格子 → 走到那格要花多少移動力
 var cells: Dictionary[Vector2i, float] = {}
 ## 起點格子
 var origin: Vector2i
 
 var _grid: PathGrid
+## 上一次 reachable_cells() 算的：每一格是從哪一格走過來的
+var _came_from: Dictionary[Vector2i, Vector2i] = {}
 
 
 func _ready() -> void:
@@ -66,17 +73,51 @@ func reachable_cells(start: Vector2i, move_points: float) -> Dictionary[Vector2i
 		return {}
 	var spent: Dictionary[Vector2i, float] = {start: 0.0}         # 走到每一格花了多少
 	var frontier: Array[Vector2i] = [start]                        # 還要往外擴散的格子
+	_came_from.clear()
 	while not frontier.is_empty():
 		var current: Vector2i = _take_cheapest(frontier, spent)    # 先處理花最少的（Dijkstra）
-		for next: Vector2i in _grid.neighbors(current):
-			var cost: float = spent[current] + _grid.cost_of(next) * _step_length(current, next)
+		if current != start and stop_rule.is_valid() and stop_rule.call(current):
+			continue                                               # 走到這格就得停，不能再往外走
+		for next: Vector2i in _neighbors(current):
+			var step: float = _step_cost(current, next)
+			if step < 0.0:
+				continue                                           # 這個角色不能走
+			var cost: float = spent[current] + step
 			if cost > move_points + 0.001:
 				continue                                           # 移動力不夠，走不到
 			if spent.has(next) and spent[next] <= cost:
 				continue                                           # 已經有更省的走法
 			spent[next] = cost
+			_came_from[next] = current
 			frontier.append(next)
 	return spent
+
+
+## 上一次 reachable_cells() 的起點走到 cell 的路（不含起點）。走不到＝空的
+func path_to(cell: Vector2i) -> Array[Vector2i]:
+	var path: Array[Vector2i] = []
+	while _came_from.has(cell):
+		path.push_front(cell)
+		cell = _came_from[cell]
+	return path
+
+
+## 旁邊的格子：有自己的規則就全部都問（連牆也問），沒有就只有走得到的
+func _neighbors(cell: Vector2i) -> Array[Vector2i]:
+	if not cost_rule.is_valid():
+		return _grid.neighbors(cell)
+	var result: Array[Vector2i] = []
+	for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		if _grid.astar.is_in_boundsv(cell + d):
+			result.append(cell + d)
+	return result
+
+
+## 走一步要花多少（負數＝不能走）
+func _step_cost(from: Vector2i, to: Vector2i) -> float:
+	if cost_rule.is_valid():
+		return cost_rule.call(from, to)
+	return _grid.cost_of(to) * _step_length(from, to)
 
 
 func _take_cheapest(frontier: Array[Vector2i], spent: Dictionary[Vector2i, float]) -> Vector2i:

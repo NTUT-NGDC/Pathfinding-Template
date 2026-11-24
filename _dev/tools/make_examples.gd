@@ -52,20 +52,6 @@ const TD_MAP: PackedStringArray = [
 	"####################################",
 ]
 
-const TACTICS_MAP: PackedStringArray = [
-	"##########################",
-	"#........................#",
-	"#..A.......~~~......Z....#",
-	"#..........~~~...........#",
-	"#....###...~~~...###.....#",
-	"#..A.###.........###..Z..#",
-	"#....###...~~~...###.....#",
-	"#..........~~~...........#",
-	"#..A.......~~~......Z....#",
-	"#........................#",
-	"##########################",
-]
-
 var _root: Node2D
 
 
@@ -77,7 +63,7 @@ func _ready() -> void:
 	if only.is_empty() or only.has("tower_defense"):
 		ok = _save(_build_tower_defense(), "res://examples/tower_defense/levels/tower_defense.tscn") and ok
 	if only.is_empty() or only.has("tactics"):
-		ok = _save(_build_tactics(), "res://examples/tactics/levels/tactics.tscn") and ok
+		_tactics_maps()
 	get_tree().quit(0 if ok else 1)
 
 
@@ -295,38 +281,109 @@ func _wave(count: int, interval: float, speed: float, health: float, enemy: Stri
 
 # ---- 戰棋 ----
 
-func _build_tactics() -> Node2D:
-	_new_root("Tactics")
-	_root.position = Vector2(224, 184)                            # 地圖比較小，放在畫面中間
-	var layers: Array[TileMapLayer] = _paint(TACTICS_MAP)
-	var counts: Dictionary[String, int] = {}
-	_add_grid(layers, 0)                                          # 戰棋：不斜走
-	for y: int in TACTICS_MAP.size():
-		for x: int in TACTICS_MAP[y].length():
-			var c: String = TACTICS_MAP[y][x]
-			if c == "A" or c == "Z":
-				var unit: Node2D = _instance("res://examples/tactics/features/unit/unit.tscn", "Ally" if c == "A" else "Enemy", _at(Vector2i(x, y)), counts)
-				unit.set("team", 0 if c == "A" else 1)
-				unit.set("move_points", 4 if c == "A" else 3)
-	var move_range: Node2D = _instance("res://addons/ngdc_pathfinding/move_range/move_range.tscn", "MoveRange", Vector2.ZERO, counts)
-	var hud: CanvasLayer = _add(CanvasLayer.new(), "HUD", _root)
-	hud.layer = 20                                                # 在黑暗（10）、視野錐（11）、除錯（12）上面，暫停（30）下面
-	var box: VBoxContainer = _add(VBoxContainer.new(), "Info", hud)
-	box.position = Vector2(22, 12)
-	var turn_label: Label = _add(Label.new(), "TurnLabel", box)
-	turn_label.text = "我方回合"
-	turn_label.add_theme_font_size_override("font_size", 33)
-	_hint(box, "點藍色棋子 → 點亮起來的格子移動　走到敵人旁邊會攻擊　沼澤很難走　右鍵取消")
-	var end_turn: Button = _add(Button.new(), "EndTurnButton", hud)
-	end_turn.text = "結束回合"
-	end_turn.add_theme_font_size_override("font_size", 22)
-	end_turn.position = Vector2(1080, 640)
-	end_turn.size = Vector2(176, 44)
-	var manager: Node = _instance("res://examples/tactics/features/turn/turn_manager.tscn", "TurnManager", Vector2.ZERO, counts)
-	manager.set("move_range", move_range)
-	manager.set("turn_label", turn_label)
-	manager.set("end_turn_button", end_turn)
-	return _root
+## 戰棋的範例地圖：maps/名稱.tres（已經有就不蓋掉），再做成關卡。
+## 主關卡 levels/tactics.tscn 是直接在 Godot 裡改的，不在這裡產生
+func _tactics_maps() -> void:
+	var map: TacticsMap = _tactics_map("default", Vector2i(44, 24), Vector2i(3, 12), [])
+	map.rewards = ["res://examples/tactics/features/units/assassin.tscn"]
+	map.allies = {Vector2i(6, 2): "res://examples/tactics/features/units/mage.tscn"}
+	map.party_max = 5
+	for rect: Rect2i in [Rect2i(11, 1, 1, 8), Rect2i(11, 14, 1, 9), Rect2i(27, 1, 1, 6), Rect2i(27, 11, 1, 12), Rect2i(28, 11, 8, 1)]:
+		map.paint_cells(TacticsMap.Kind.WALL, rect)
+	for rect: Rect2i in [Rect2i(5, 4, 3, 3), Rect2i(14, 3, 3, 2), Rect2i(20, 17, 4, 3), Rect2i(31, 3, 2, 3), Rect2i(14, 12, 2, 3), Rect2i(37, 16, 3, 3)]:
+		_tactics_blob(map, TacticsMap.Kind.FOREST, rect)
+	_tactics_blob(map, TacticsMap.Kind.SWAMP, Rect2i(18, 7, 5, 4))
+	_tactics_blob(map, TacticsMap.Kind.SWAMP, Rect2i(30, 14, 4, 4))
+	_tactics_blob(map, TacticsMap.Kind.HIGH, Rect2i(22, 2, 3, 3))
+	_tactics_blob(map, TacticsMap.Kind.HIGH, Rect2i(35, 5, 4, 3))
+	map.supplies = 2
+	map.supply_cells = [Vector2i(5, 20), Vector2i(24, 20)]
+	map.chests = {Vector2i(31, 21): 1, Vector2i(41, 21): 2}
+	_tactics_squad(map, "哨兵", [["lizard", 17, 12], ["archer", 19, 12]], [Vector2i(17, 12), Vector2i(17, 20), Vector2i(23, 14)], {"patrol_mode": 1, "view_distance": 160.0})
+	_tactics_squad(map, "巡邏隊", [["cavalry", 22, 9], ["assassin", 24, 9]], [Vector2i(24, 9), Vector2i(14, 8), Vector2i(14, 2)], {"patrol_speed": 60.0, "view_distance": 160.0, "drop_supplies": 1})
+	_tactics_squad(map, "守門的", [["knight", 37, 8], ["mage", 38, 7], ["hammer", 37, 10]], [], {"start_angle": 180.0, "view_distance": 220.0})
+	_tactics_save(map)
+
+	map = _tactics_map("boss", Vector2i(46, 24), Vector2i(3, 20), [])
+	map.rewards = ["res://examples/tactics/features/units/hammer.tscn"]
+	map.party_max = 5
+	map.win = TacticsMap.Win.BOSS
+	map.supplies = 3
+	for rect: Rect2i in [Rect2i(1, 16, 14, 1), Rect2i(18, 16, 6, 1), Rect2i(24, 8, 1, 9), Rect2i(24, 8, 12, 1), Rect2i(39, 8, 6, 1), Rect2i(10, 5, 1, 8), Rect2i(34, 14, 1, 9)]:
+		_tactics_ridge(map, rect)
+	for rect: Rect2i in [Rect2i(7, 18, 3, 3), Rect2i(18, 19, 3, 3), Rect2i(27, 11, 3, 3), Rect2i(3, 4, 4, 3), Rect2i(15, 8, 3, 4), Rect2i(37, 18, 4, 3)]:
+		_tactics_blob(map, TacticsMap.Kind.FOREST, rect)
+	_tactics_blob(map, TacticsMap.Kind.SWAMP, Rect2i(26, 17, 5, 4))
+	_tactics_blob(map, TacticsMap.Kind.SWAMP, Rect2i(13, 2, 4, 4))
+	_tactics_blob(map, TacticsMap.Kind.HIGH, Rect2i(38, 2, 5, 3))
+	map.chests = {Vector2i(3, 2): 2, Vector2i(43, 21): 1}
+	_tactics_squad(map, "門口守衛", [["swordsman", 16, 14], ["archer", 17, 13]], [Vector2i(12, 14), Vector2i(21, 14)], {"support": 14, "view_distance": 160.0, "drop_supplies": 1})
+	_tactics_squad(map, "游擊隊", [["assassin", 29, 15], ["lizard", 30, 15]], [Vector2i(28, 15), Vector2i(32, 19), Vector2i(28, 22)], {"patrol_mode": 1, "view_distance": 160.0})
+	_tactics_squad(map, "弓兵隊", [["archer", 38, 12], ["knight", 38, 13]], [Vector2i(37, 12), Vector2i(42, 15)], {"view_distance": 160.0})
+	_tactics_squad(map, "首領", [["hammer", 41, 3], ["mage", 42, 2], ["healer", 42, 4], ["swordsman", 40, 4]], [], {"boss": true, "view_distance": 240.0})
+	_tactics_save(map)
+
+	map = _tactics_map("arena", Vector2i(28, 16), Vector2i(4, 8), ["swordsman", "archer", "knight", "mage", "cavalry", "healer", "flyer", "lizard"])
+	map.party_max = 6
+	map.auto_battle = false                                       # 純戰棋：一開始就布陣，自己操作
+	map.paint_cells(TacticsMap.Kind.WALL, Rect2i(13, 1, 2, 4))
+	map.paint_cells(TacticsMap.Kind.WALL, Rect2i(13, 11, 2, 4))
+	map.paint_cells(TacticsMap.Kind.SWAMP, Rect2i(12, 6, 4, 4))
+	for rect: Rect2i in [Rect2i(8, 3, 2, 3), Rect2i(18, 10, 2, 3), Rect2i(8, 11, 2, 2), Rect2i(18, 3, 2, 2)]:
+		map.paint_cells(TacticsMap.Kind.FOREST, rect)
+	map.paint_cells(TacticsMap.Kind.HIGH, Rect2i(10, 7, 1, 2))
+	map.paint_cells(TacticsMap.Kind.HIGH, Rect2i(17, 7, 1, 2))
+	_tactics_squad(map, "對手", [["knight", 21, 8], ["swordsman", 21, 6], ["archer", 23, 7], ["mage", 23, 9]], [], {"instant": true})
+	_tactics_save(map)
+
+
+## 圓滑的一塊地形（蓋住 cells 這些格子）
+func _tactics_blob(map: TacticsMap, kind: TacticsMap.Kind, cells: Rect2i) -> void:
+	map.paint_ellipse(kind, Rect2(cells.position * TacticsMap.CELL, cells.size * TacticsMap.CELL).grow(8.0))
+
+
+## 圓滑的岩壁：沿著 cells 這一排格子畫過去
+func _tactics_ridge(map: TacticsMap, cells: Rect2i) -> void:
+	var from: Vector2 = map.cell_center(cells.position)
+	var to: Vector2 = map.cell_center(cells.end - Vector2i.ONE)
+	var steps: int = maxi(int(from.distance_to(to) / 8.0), 1)
+	for i: int in steps + 1:
+		var at: Vector2 = from.lerp(to, float(i) / steps)
+		map.paint(TacticsMap.Kind.WALL, at + Vector2.from_angle(i * 0.9) * 3.0, 20.0 + 3.0 * sin((at.x + at.y) * 0.035))
+
+
+func _tactics_map(map_name: String, size: Vector2i, start: Vector2i, party: Array) -> TacticsMap:
+	var map: TacticsMap = TacticsMap.new()
+	map.map_name = map_name
+	map.size = size
+	map.start_cell = start
+	map.ensure()
+	map.paint_cells(TacticsMap.Kind.WALL, Rect2i(Vector2i.ZERO, size))       # 外面一圈牆
+	map.paint_cells(TacticsMap.Kind.PLAIN, Rect2i(Vector2i.ONE, size - Vector2i(2, 2)))
+	for unit: String in party:
+		map.party.append("res://examples/tactics/features/units/%s.tscn" % unit)
+	return map
+
+
+func _tactics_squad(map: TacticsMap, squad_name: String, units: Array, patrol: Array[Vector2i], settings: Dictionary) -> void:
+	var squad: TacticsSquad = TacticsSquad.new()
+	squad.squad_name = squad_name
+	for unit: Array in units:
+		squad.add("res://examples/tactics/features/units/%s.tscn" % unit[0], Vector2i(unit[1], unit[2]))
+	squad.patrol = patrol
+	for key: String in settings:
+		squad.set(key, settings[key])
+	map.squads.append(squad)
+
+
+func _tactics_save(map: TacticsMap) -> void:
+	var path: String = "res://examples/tactics/maps/%s.tres" % map.map_name
+	if ResourceLoader.exists(path):
+		return                                                    # 已經有就不蓋掉（可能用編輯器改過）
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(path.get_base_dir()))
+	print("存檔 %s：%s" % [path, error_string(ResourceSaver.save(map, path))])
+	if map.map_name != "default":                                 # default 就是 tactics.tscn 用的
+		TacticsLevelMaker.make(path)
 
 
 # ---- 共用 ----

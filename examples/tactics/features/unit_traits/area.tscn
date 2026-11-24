@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://examples/tactics/features/unit_traits/scripts/trait_area.gd" id="1_script"]
+
+[node name="Area" type="Node2D"]
+script = ExtResource("1_script")

@@ -1,0 +1,17 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://examples/tactics/features/unit/unit.tscn" id="1_unit"]
+[ext_resource type="PackedScene" path="res://examples/tactics/features/unit_traits/lifesteal.tscn" id="2_lifesteal"]
+
+[node name="Assassin" instance=ExtResource("1_unit")]
+display_name = "刺客"
+mark = "刺"
+color = Color(0.3529, 0.2902, 0.4157, 1)
+max_health = 16
+attack = 8
+defense = 0
+move_points = 5
+speed = 10
+mind = 2
+
+[node name="Lifesteal" parent="." instance=ExtResource("2_lifesteal")]

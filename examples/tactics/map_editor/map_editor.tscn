@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://bo7yd14tmrqh2"]
+
+[ext_resource type="Script" uid="uid://b88qy86yrf6rl" path="res://examples/tactics/map_editor/scripts/tactics_editor.gd" id="1_script"]
+
+[node name="TacticsEditor" type="Node2D" unique_id=465390191]
+script = ExtResource("1_script")
