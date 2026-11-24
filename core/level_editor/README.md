@@ -6,10 +6,12 @@
 
 ## 用這個底做好的編輯器
 
+塔防、戰棋、追逐在尋路積木的 repo（[Pathfinding-Template](https://github.com/NTUT-NGDC/Pathfinding-Template)）。
+
 | 編輯器 | 特色 | 想做類似的就看它 |
 | --- | --- | --- |
 | [sample/](sample/) | 最小範例：畫牆、放起點和星星，地圖用 `.tres` | 第一次做 |
-| 塔防 `examples/tower_defense/map_editor/`（尋路積木的 repo） | 圓滑地形、波次頁、怪物頁 | 要有自己的資料頁、掛件 |
+| 塔防 `examples/tower_defense/map_editor/` | 圓滑地形、波次頁、怪物頁 | 要有自己的資料頁、掛件 |
 | 戰棋 `examples/tactics/map_editor/` | 五頁、可以切換對齊格子、隊伍 | 很多種東西、規則頁 |
 | 追逐 `examples/chase/map_editor/` | 直接讀寫關卡 `.tscn`，物件放上去，右邊面板改數值；同一種物件可以有好幾「種類」 | 關卡是場景、物件是場景、工具很多要分類 |
 
