@@ -30,7 +30,7 @@
 ```
 core/          起手包（不要改）
 addons/        技術積木（不要改），每週一包，例如 addons/ngdc_pathfinding/
-examples/      範例遊戲，可以從這裡複製來改
+examples/      範例遊戲，從範例改的話直接在裡面改（資料夾填進分工表）
 features/      每個功能一個資料夾，一個人負責
   <功能名稱>/
 	<功能名稱>.tscn   場景直接放
