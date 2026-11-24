@@ -22,6 +22,16 @@ func _ready() -> void:
 	apply()
 
 
+## 編輯器的「怪物」頁顯示的名字（給各個掛件覆寫）
+func trait_name() -> String:
+	return String(name)
+
+
+## 編輯器的「怪物」頁顯示的欄位名字：欄位 → 中文（沒寫的就顯示欄位原本的名字）
+func labels() -> Dictionary:
+	return {}
+
+
 ## 掛上去的時候做什麼（給各個掛件覆寫）
 func apply() -> void:
 	pass

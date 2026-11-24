@@ -190,10 +190,10 @@ func _build_tower_defense() -> Node2D:
 	var counts: Dictionary[String, int] = {}
 	var spawner: Spawner = _instance("res://addons/ngdc_pathfinding/spawner/spawner.tscn", "Spawner", map.cell_center(map.spawn_cells[0]), counts)
 	spawner.lose_when_reached = false                             # 基地有血量，扣光才輸（看 BaseGroup）
-	spawner.start_delay = 5.0
-	spawner.time_between_waves = 6.0
 	const ENEMIES: String = "res://examples/tower_defense/features/enemies/"
-	spawner.waves = [
+	var table: WaveTable = WaveTable.new()
+	table.table_name = "default"
+	table.waves = [
 		_wave(6, 1.2, 50, 3),
 		_wave(6, 0.9, 0, 3, ENEMIES + "fast_walker.tscn"),
 		_wave(5, 1.4, 45, 6, ENEMIES + "splitter.tscn"),
@@ -201,6 +201,10 @@ func _build_tower_defense() -> Node2D:
 		_wave(4, 2.0, 40, 6, ENEMIES + "tank_walker.tscn"),
 		_wave(4, 1.5, 45, 8, ENEMIES + "healer_walker.tscn"),
 	]
+	const WAVES: String = "res://examples/tower_defense/waves/default.tres"
+	if not ResourceLoader.exists(WAVES):
+		ResourceSaver.save(table, WAVES)                          # 已經有就不蓋掉（可能用編輯器改過）
+	spawner.wave_table = load(WAVES)
 	var camera: PanCamera = _instance("res://core/camera/pan_camera.tscn", "PanCamera", Vector2(576, 312), counts)
 	var loader: MapLoader = _instance("res://examples/tower_defense/features/map/map_loader.tscn", "MapLoader", Vector2.ZERO, counts)
 	loader.map = map

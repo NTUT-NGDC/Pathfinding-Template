@@ -8,6 +8,8 @@ extends Node2D
 ##   ・Target：把基地（任何 Node2D）拖進來
 ##   ・Waves：按「＋」加一波，設定出幾隻、間隔、速度、血量（敵人場景空著＝預設的 Walker）
 ##   ・走到基地就輸／全部打完就贏：打勾就會呼叫起手包的 GameFlow
+##   ・波次也可以存成檔案（WaveTable），拖進 Wave Table；有放就用它，不看 Waves
+##   ・一波混好幾種怪：那幾列的 With Previous 打勾（跟上一列同時出）
 ## 怪走到基地會發出 reached_goal，然後消失。
 ##
 ## 好幾個出怪口，三種做法：
@@ -24,6 +26,8 @@ signal spawned(enemy: Node2D)
 signal reached_goal(enemy: Node2D)
 ## 所有波次都出完、而且場上的怪都沒了
 signal all_cleared()
+## 一波裡的其中一列出完了（自己用）
+signal _row_done()
 
 const DEFAULT_ENEMY: PackedScene = preload("res://addons/ngdc_pathfinding/spawner/walker.tscn")
 
@@ -34,6 +38,10 @@ const DEFAULT_ENEMY: PackedScene = preload("res://addons/ngdc_pathfinding/spawne
 @export var more_targets: Array[Node2D] = []
 ## 更多出怪口（生怪器自己是第 1 個）
 @export var more_spawn_points: Array[Node2D] = []
+## 波次檔（有放就用它的波次、等待時間，不看下面的 Waves、Time Between Waves、Start Delay）
+@export var wave_table: WaveTable
+## 從第幾波開始（測試後面的波次用）
+@export_range(1, 100, 1) var start_wave: int = 1
 ## 波次表：一波出什麼、幾隻、間隔多久
 @export var waves: Array[Wave] = []
 ## 每一波之間休息幾秒
@@ -93,20 +101,38 @@ func _wait(seconds: float) -> void:
 
 
 func _run() -> void:
-	await _wait(start_delay)
-	for i: int in waves.size():
-		var wave: Wave = waves[i]
-		if wave == null:
-			continue
+	await _wait(wave_table.start_delay if wave_table != null else start_delay)
+	var groups: Array[Array] = wave_groups()
+	for i: int in range(start_wave - 1, groups.size()):
 		wave_number = i + 1
 		wave_started.emit(wave_number)
-		for n: int in wave.count:
-			spawn(wave)
-			await _wait(wave.interval)
-		if i < waves.size() - 1:
-			await _wait(time_between_waves)
+		await _spawn_group(groups[i])
+		if i < groups.size() - 1:
+			await _wait(wave_table.time_between_waves if wave_table != null else time_between_waves)
 	_done_spawning = true
 	_check_cleared()
+
+
+## 一波一波分好的波次（Wave Table 有放就用它的）
+func wave_groups() -> Array[Array]:
+	return wave_table.groups() if wave_table != null else WaveTable.group(waves)
+
+
+## 出一波：每一列各自照自己的間隔同時出，全部出完才算出完
+func _spawn_group(rows: Array) -> void:
+	var left: Array[int] = [rows.size()]
+	for row: Wave in rows:
+		_spawn_row(row, left)
+	while left[0] > 0:
+		await _row_done
+
+
+func _spawn_row(row: Wave, left: Array[int]) -> void:
+	for n: int in row.count:
+		spawn(row)
+		await _wait(row.interval)
+	left[0] -= 1
+	_row_done.emit()
 
 
 ## 生一隻怪，叫它走向目標

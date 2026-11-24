@@ -4,6 +4,10 @@ extends EnemyTrait
 ## 會飛：不尋路，直線飛向基地，牆和塔都擋不住。拿來對比「會尋路的怪」。
 
 
+func trait_name() -> String:
+	return "會飛"
+
+
 func apply() -> void:
 	var follower: PathFollower = walker.get_node_or_null("PathFollower") as PathFollower
 	if follower != null:

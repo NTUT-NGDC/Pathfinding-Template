@@ -1,0 +1,58 @@
+[gd_resource type="Resource" script_class="WaveTable" format=3]
+
+[ext_resource type="Script" path="res://addons/ngdc_pathfinding/spawner/scripts/wave_table.gd" id="1_o05gl"]
+[ext_resource type="Script" path="res://addons/ngdc_pathfinding/spawner/scripts/wave.gd" id="2_2rxhh"]
+[ext_resource type="PackedScene" path="res://examples/tower_defense/features/enemies/fast_walker.tscn" id="3_2wbmt"]
+[ext_resource type="PackedScene" path="res://examples/tower_defense/features/enemies/splitter.tscn" id="4_mdwrx"]
+[ext_resource type="PackedScene" path="res://examples/tower_defense/features/enemies/flyer.tscn" id="5_xcher"]
+[ext_resource type="PackedScene" path="res://examples/tower_defense/features/enemies/tank_walker.tscn" id="6_o05gl"]
+[ext_resource type="PackedScene" path="res://examples/tower_defense/features/enemies/healer_walker.tscn" id="7_fxmxp"]
+
+[sub_resource type="Resource" id="Resource_2rxhh"]
+script = ExtResource("2_2rxhh")
+count = 6
+interval = 1.2
+speed = 50.0
+health = 3.0
+
+[sub_resource type="Resource" id="Resource_2wbmt"]
+script = ExtResource("2_2rxhh")
+enemy_scene = ExtResource("3_2wbmt")
+count = 6
+interval = 0.9
+health = 3.0
+
+[sub_resource type="Resource" id="Resource_mdwrx"]
+script = ExtResource("2_2rxhh")
+enemy_scene = ExtResource("4_mdwrx")
+interval = 1.4
+speed = 45.0
+health = 6.0
+
+[sub_resource type="Resource" id="Resource_xcher"]
+script = ExtResource("2_2rxhh")
+enemy_scene = ExtResource("5_xcher")
+count = 6
+speed = 45.0
+health = 4.0
+
+[sub_resource type="Resource" id="Resource_trum8"]
+script = ExtResource("2_2rxhh")
+enemy_scene = ExtResource("6_o05gl")
+count = 4
+interval = 2.0
+speed = 40.0
+health = 6.0
+
+[sub_resource type="Resource" id="Resource_fxmxp"]
+script = ExtResource("2_2rxhh")
+enemy_scene = ExtResource("7_fxmxp")
+count = 4
+interval = 1.5
+speed = 45.0
+health = 8.0
+
+[resource]
+script = ExtResource("1_o05gl")
+table_name = "default"
+waves = Array[ExtResource("2_2rxhh")]([SubResource("Resource_2rxhh"), SubResource("Resource_2wbmt"), SubResource("Resource_mdwrx"), SubResource("Resource_xcher"), SubResource("Resource_trum8"), SubResource("Resource_fxmxp")])

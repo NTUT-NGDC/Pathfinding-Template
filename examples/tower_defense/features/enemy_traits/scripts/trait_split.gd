@@ -13,6 +13,14 @@ extends EnemyTrait
 const SMALL: PackedScene = preload("res://addons/ngdc_pathfinding/spawner/walker.tscn")
 
 
+func trait_name() -> String:
+	return "分裂"
+
+
+func labels() -> Dictionary:
+	return {"count": "分成幾隻", "health_ratio": "小的血量 ×", "speed_ratio": "小的速度 ×"}
+
+
 func apply() -> void:
 	walker.died.connect(_on_died)
 

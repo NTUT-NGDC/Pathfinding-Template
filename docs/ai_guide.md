@@ -82,7 +82,7 @@ game_config.tres   遊戲名稱、開始場景、Credits 名單
 | 範例 | 用到的積木 | 可以改成 |
 | --- | --- | --- |
 | `examples/chase/`：在房子裡拿東西、修發電機逃出去，被追逐 AI 追；有捕獸夾（AI 追丟會放）、警報、可以丟的瓶子（出口條件看「目標」接口：group `objectives`＋`required`／`is_done`／`category`＋`completed`，說明在範例 README） | 尋路地圖、追逐 AI、視野、聲音 | 潛行、恐怖逃脫、小精靈、外送 |
-| `examples/tower_defense/`：點格子放牆／塔，怪即時改路；牆可以被怪打破（`TDWall`：Breakable、Max Health、Break Cost，A* 比較要繞路還是拆）；左鍵點塔升級（塔的檢查器「升級」）；地圖用地圖編輯器畫（`map_editor/`，存在 `maps/`，出怪口、基地可以好幾個，基地規則看 `BaseGroup`；地形有岩石、沼澤、高地，地圖裡勾哪種地面可以蓋塔、蓋牆（`TDMap.tower_ground`、`wall_ground`：迷宮型蓋空地、固定路線型只蓋高地）；試玩在編輯器裡直接玩）；怪物掛件（`enemy_traits/`：加速、厚血、裝甲、會飛、分裂、治療）、砲塔掛件（`tower_traits/`：緩速、範圍、多重射擊）拖到怪或塔底下就生效 | 尋路地圖、生怪器、跟著路徑走 | 塔防、殭屍圍城、路網規劃 |
+| `examples/tower_defense/`：點格子放牆／塔，怪即時改路；牆可以被怪打破（`TDWall`：Breakable、Max Health、Break Cost，A* 比較要繞路還是拆）；左鍵點塔升級（塔的檢查器「升級」）；地圖、波次、怪物都用編輯器做（`map_editor/`：地圖存 `maps/`、波次存 `waves/`（`WaveTable`）、怪物存 `features/enemies/`；出怪口、基地可以好幾個，基地規則看 `BaseGroup`；地形有岩石、沼澤、高地，地圖裡勾哪種地面可以蓋塔、蓋牆（`TDMap.tower_ground`、`wall_ground`：迷宮型蓋空地、固定路線型只蓋高地）；試玩在編輯器裡直接玩）；怪物掛件（`enemy_traits/`：加速、厚血、裝甲、會飛、分裂、治療）、砲塔掛件（`tower_traits/`：緩速、範圍、多重射擊）拖到怪或塔底下就生效 | 尋路地圖、生怪器、跟著路徑走 | 塔防、殭屍圍城、路網規劃 |
 | `examples/tactics/`：點角色看移動範圍、點格子走過去 | 尋路地圖、移動範圍、跟著路徑走 | 戰棋、自走棋、小隊指揮、經營 |
 
 ### 已經設定好的按鍵（`project.godot`，不用再加）

@@ -7,6 +7,14 @@ extends EnemyTrait
 @export_range(0.05, 1.0, 0.05) var damage_multiplier: float = 0.5
 
 
+func trait_name() -> String:
+	return "裝甲"
+
+
+func labels() -> Dictionary:
+	return {"damage_multiplier": "受到的傷害 ×"}
+
+
 func apply() -> void:
 	walker.damage_taken_multiplier *= damage_multiplier
 

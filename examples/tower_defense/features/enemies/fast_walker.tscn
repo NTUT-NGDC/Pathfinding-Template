@@ -4,6 +4,7 @@
 [ext_resource type="PackedScene" path="res://examples/tower_defense/features/enemy_traits/fast.tscn" id="2_fast"]
 
 [node name="FastWalker" instance=ExtResource("1_walker")]
+display_name = "快怪"
 color = Color(0.95, 0.75, 0.25, 1)
 
 [node name="Fast" parent="." instance=ExtResource("2_fast")]

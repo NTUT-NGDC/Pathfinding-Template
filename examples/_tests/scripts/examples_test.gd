@@ -367,6 +367,8 @@ func _test_tower_defense() -> void:
 	await _test_td_enemy_traits()
 	await _test_td_towers_and_hud()
 	await _test_map_editor()
+	await _test_wave_page()
+	await _test_enemy_page()
 
 
 ## 打得壞的牆：堵死會拆、繞路便宜就繞、成本高低決定、多隻一起打、飛行怪不理牆、沼澤上的牆、不能斜鑽
@@ -379,6 +381,7 @@ func _test_td_walls() -> void:
 	var money: ScoreDisplay = _level.get_node("HUD/Info/Money")
 	var base: Node2D = builder.goal_points()[0]
 	spawner.win_when_cleared = false                              # 這裡自己生怪，不要關卡的波次跑來干擾
+	spawner.wave_table = null
 	spawner.waves = []
 	money.score = 1000
 	builder.selected = 0
@@ -858,7 +861,14 @@ func _test_map_editor() -> void:
 
 	var name_edit: LineEdit = editor.get("_name_edit")
 	name_edit.text = "_test_map"
+	editor.call("update_save_buttons")
+	_expect(editor.call("is_dirty") and (editor.get("_save_button") as Button).text == "存檔＊", "改了地圖：存檔按鈕多一個＊")
 	var path: String = editor.call("save_map")
+	_expect(not editor.call("is_dirty") and (editor.get("_save_button") as Button).text == "存檔", "地圖存好：＊不見")
+	editor.call("paint_at", map.cell_center(Vector2i(6, 6)))
+	var painted_dirty: bool = editor.call("is_dirty")
+	map.restore(editor.get("saved_state"))
+	_expect(painted_dirty and not editor.call("is_dirty"), "再畫就又沒存；退回存檔時的樣子就不算")
 	_expect(path.ends_with("maps/_test_map.tres") and FileAccess.file_exists(path), "存檔：存進 maps/ 資料夾")
 	editor.call("_new")
 	_expect(not (editor.get("map") as TDMap).is_swamp(cell), "新地圖：空的")
@@ -1006,6 +1016,174 @@ func _test_td_build_rules() -> void:
 	var bases: Array[Node2D] = builder.goal_points()
 	var path: PackedVector2Array = grid.find_path(spawner.global_position, bases[0].global_position)
 	_expect(not path.is_empty() and grid.cell_of(path[path.size() - 1]) == grid.cell_of(bases[0].global_position), "固定路線地圖：怪走得到基地")
+
+
+## 編輯器的波次頁：加減搬複製、同時出、實際血量、上一步、存讀檔、從第幾波試玩
+func _test_wave_page() -> void:
+	TDWavePage.editing = null
+	await _load("res://examples/tower_defense/map_editor/map_editor.tscn")
+	var editor: Node2D = _level
+	editor.call("load_map", "res://examples/tower_defense/maps/two_gates.tres")
+	editor.call("set_page", 1)
+	var page: TDWavePage = editor.get("_wave_page")
+	_expect(page.visible and not (editor.get("_map_tools") as Control).visible and page.spawn_count == 2, "波次頁：地圖工具藏起來、有 2 個出怪口")
+	_expect(page.groups().size() == 6 and page.table.table_name == "default", "一開始是 default 的 6 波")
+	var level: Node = (load(TOWER_DEFENSE) as PackedScene).instantiate()
+	_expect((level.get_node("Spawner") as Spawner).wave_table != null and (level.get_node("Spawner") as Spawner).wave_groups().size() == 6, "關卡的 Spawner 用波次檔（6 波）")
+	level.free()
+
+	var tank: Wave = page.groups()[4][0]
+	var texts: Array = page.call("_row_text", tank)
+	_expect(texts[0] == "→ 18（要打 36）", "實際血量：填 6、厚血 ×3、裝甲減半（%s）" % texts[0])
+	_expect(get_tree().get_nodes_in_group("enemies").is_empty(), "算數值用的怪不會留在場上")
+	page.add_row(0)
+	_expect(page.groups().size() == 6 and page.groups()[0].size() == 2 and int(page.summary(page.groups()[0])["count"]) == 11, "＋同時出：第 1 波變兩種怪、共 11 隻")
+	page.set_value(page.groups()[0][1], "enemy_scene", load("res://examples/tower_defense/features/enemies/flyer.tscn"))
+	page.set_value(page.groups()[0][1], "spawn_point", 2)
+	page.copy_wave(0)
+	_expect(page.groups().size() == 7 and page.groups()[1].size() == 2 and page.groups()[1][1] != page.groups()[0][1], "複製整波")
+	page.add_wave()
+	_expect(page.groups().size() == 8, "＋新的一波")
+	_expect(page.move_wave(7, -1) and not page.move_wave(0, -1), "往前移；第一波不能再往前")
+	_expect(page.delete_row(1, 1) and page.groups()[1].size() == 1 and page.delete_row(1, 0) and page.groups().size() == 7, "✕：拿掉一種；空了就整波拿掉")
+	for i: int in 4:
+		editor.call("undo")
+	_expect(page.groups().size() == 7 and page.groups()[1].size() == 2, "上一步：退回複製完的樣子（%d 波）" % page.groups().size())
+	editor.call("redo")
+	_expect(page.groups().size() == 8, "下一步")
+	page.set_table_value("start_delay", 0.5)
+	page.set_table_value("time_between_waves", 1.0)
+
+	(page.get("_name_edit") as LineEdit).text = "_test_waves"
+	editor.call("update_save_buttons")
+	_expect(page.is_dirty() and (page.get("_save_button") as Button).text == "存檔＊", "改了波次：存檔按鈕多一個＊")
+	var path: String = page.save()
+	_expect(not page.is_dirty() and (page.get("_save_button") as Button).text == "存檔", "波次存好：＊不見")
+	_expect(path.ends_with("waves/_test_waves.tres") and FileAccess.file_exists(path) and page.files().has(path), "存檔：存進 waves/ 資料夾")
+	page.new_table()
+	_expect(page.groups().size() == 1, "新的：1 波")
+	_expect(not page.delete_row(0, 0), "最後一種怪不能拿掉")
+	editor.call("undo")
+	_expect(page.groups().size() == 8, "按到「新的」：上一步拿得回來")
+	_expect(page.load_table(path) and page.groups().size() == 8 and page.groups()[0][1].spawn_point == 2 and page.groups()[0][1].enemy_scene.resource_path.ends_with("flyer.tscn") and page.table.start_delay == 0.5, "讀檔：怪、出怪口、等待時間都回來了")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+
+	# 打到一半的數字：存檔、試玩前會先算數
+	var spin: SpinBox = page.get("_start_delay")
+	spin.get_line_edit().grab_focus()
+	spin.get_line_edit().text = "3"
+	page.commit()
+	_expect(is_equal_approx(page.table.start_delay, 3.0), "打到一半的數字：先算數（%.1f）" % page.table.start_delay)
+	page.set_table_value("start_delay", 0.0)
+
+	# 從第 2 波試玩：用這份波次、補前面幾波的錢
+	var bonus: int = page.money_before(2)
+	page.test_requested.emit(2)
+	await _frames(4)
+	Engine.time_scale = TIME_SCALE
+	var play: Node = editor.get("_play")
+	_expect(editor.call("is_testing") and bonus == 11, "▶ 從這波試玩：開始（前面 1 波 %d 元）" % bonus)
+	var spawner: Spawner = play.get_node("Spawner")
+	_expect(spawner.wave_groups().size() == 8 and spawner.start_wave == 2 and (play.get_node("HUD/Info/Money") as ScoreDisplay).score == 12 + bonus, "試玩：用現在排的波次、錢有補（%d）" % (play.get_node("HUD/Info/Money") as ScoreDisplay).score)
+	await _wait_until(func() -> bool: return spawner.alive >= 2, 300)
+	var kinds: Array[String] = []
+	for node: Node in get_tree().get_nodes_in_group("enemies"):
+		if not kinds.has(node.scene_file_path):
+			kinds.append(node.scene_file_path)
+	_expect(spawner.wave_number == 2 and kinds.size() == 2, "第 2 波：兩種怪一起出")
+	_expect(MapLoader.test_waves == null and MapLoader.test_start_wave == 1, "試玩的波次用過就清掉")
+	editor.call("stop_test")
+	await _frames(2)
+	_expect(page.is_visible_in_tree() and page.groups().size() == 8, "停止試玩：回到波次頁，排的還在")
+	editor.call("set_page", 0)
+	TDWavePage.editing = null
+	editor.set("editing", null)
+	editor.set("resume_test", false)
+
+
+## 編輯器的怪物頁：改數值、勾掛件、新怪、複製、存檔（一般的繼承場景）、上一步、普通怪不能改
+func _test_enemy_page() -> void:
+	TDEnemyPage.editing = {}
+	TDEnemyPage.editing_path = ""
+	TDWavePage.editing = null
+	await _load("res://examples/tower_defense/map_editor/map_editor.tscn")
+	var editor: Node2D = _level
+	editor.call("set_page", 2)
+	var page: TDEnemyPage = editor.get("_enemy_page")
+	var tank_path: String = "res://examples/tower_defense/features/enemies/tank_walker.tscn"
+	var tank_trait: String = "res://examples/tower_defense/features/enemy_traits/tank.tscn"
+	var fast_trait: String = "res://examples/tower_defense/features/enemy_traits/fast.tscn"
+	var split_trait: String = "res://examples/tower_defense/features/enemy_traits/split.tscn"
+	page.open(tank_path)
+	_expect(page.data["display_name"] == "坦克" and page.data["traits"].size() == 2 and is_equal_approx(page.data["traits"][tank_trait]["health_multiplier"], 3.0), "讀怪物：名字、掛件、掛件的數字")
+	_expect((page.get("_stats") as Label).text.begins_with("實際血量　30（減傷：要打 60）"), "預覽旁邊寫實際血量")
+	_expect(get_tree().get_nodes_in_group("enemies").is_empty(), "預覽的怪不算場上的怪")
+	page.open(TDEnemyInfo.DEFAULT_PATH)
+	page.set_value("speed", 999.0)
+	_expect(page.is_locked() and page.data["speed"] == 60.0 and page.save().is_empty(), "普通怪（尋路積木）不能改、不能存")
+
+	page.new_enemy()
+	page.set_value("display_name", "_測試怪")
+	page.set_value("speed", 80.0)
+	page.set_value("max_health", 20.0)
+	page.set_value("score", 5)
+	page.set_trait(tank_trait, true)
+	page.set_trait_value(tank_trait, "health_multiplier", 2.0)
+	page.set_trait(fast_trait, true)
+	await _frames(2)
+	_expect((page.get("_stats") as Label).text.contains("實際血量　40") and (page.get("_stats") as Label).text.contains("實際速度　128"), "預覽：20×2 血、80×1.6 速度（%s）" % (page.get("_stats") as Label).text.get_slice("\n", 0))
+	editor.call("undo")
+	_expect(not page.data["traits"].has(fast_trait), "上一步：掛件取消")
+	editor.call("redo")
+	_expect(page.data["traits"].has(fast_trait), "下一步：掛件回來")
+	var path: String = page.save()
+	var text: String = FileAccess.get_file_as_string(path)
+	_expect(path.ends_with("features/enemies/_測試怪.tscn") and text.contains("walker.tscn") and text.contains("instance=ExtResource") and not text.contains("walker.gd"), "新怪存成繼承 walker 的一般場景")
+	var made: Walker = (load(path) as PackedScene).instantiate()
+	_level.add_child(made)
+	_expect(made.max_health == 40.0 and made.speed == 128.0 and made.score == 5 and made.display_name == "_測試怪", "存出來的怪：掛件真的有效（%.0f 血、速度 %.0f）" % [made.max_health, made.speed])
+	made.free()
+	_expect((editor.get("_wave_page") as TDWavePage).get("_enemy_paths").has(path), "波次頁的清單有新怪")
+
+	# 再改一次：換掉掛件，用過的波次馬上是新的
+	var scene_before: PackedScene = load(path)
+	page.set_trait(fast_trait, false)
+	page.set_trait(split_trait, true)
+	page.set_trait_value(split_trait, "count", 3)
+	page.set_value("speed", 50.0)
+	_expect(TDEnemyPage.dirty and (page.get("_save_button") as Button).text == "存檔＊", "改了怪物：存檔按鈕多一個＊")
+	page.set_value("score", 7)
+	page.set_value("score", 5)
+	page.save()
+	made = scene_before.instantiate()
+	_level.add_child(made)
+	_expect(made.speed == 50.0 and made.has_node("Split") and (made.get_node("Split") as TraitSplit).count == 3 and not made.has_node("Fast") and not TDEnemyPage.dirty, "改掛件再存：已經在用的波次也是新的")
+	made.free()
+	page.copy_enemy()
+	_expect(page.path.is_empty() and page.data["display_name"] == "_測試怪2" and page.data["traits"].size() == 2, "複製成新怪")
+	page.set_value("display_name", "_測試怪")
+	_expect(page.save().is_empty(), "已經有同名的怪：不會蓋掉")
+	page.open(tank_path)
+	editor.call("undo")
+	_expect(page.path.is_empty() and page.data["display_name"] == "_測試怪", "沒存檔就換到別隻：上一步拿得回來")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+
+	# 範例的怪讀出來再存，內容不會變
+	var same: bool = true
+	for enemy_path: String in TDEnemyInfo.walker_paths():
+		if enemy_path == TDEnemyInfo.DEFAULT_PATH or enemy_path == path:
+			continue
+		var before: Dictionary = TDEnemyInfo.read(enemy_path)
+		var copy_path: String = TDEnemyInfo.ENEMIES_DIR + "_copy_test.tscn"
+		same = TDEnemyInfo.write(copy_path, before) == OK and TDEnemyInfo.read(copy_path) == before and same
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(copy_path))
+	_expect(same, "範例的 5 種怪：讀出來再存，一模一樣")
+	editor.call("set_page", 0)
+	TDEnemyPage.editing = {}
+	TDEnemyPage.editing_path = ""
+	TDEnemyPage.dirty = false
+	TDWavePage.editing = null
+	editor.set("editing", null)
 
 
 # ---- 戰棋 ----

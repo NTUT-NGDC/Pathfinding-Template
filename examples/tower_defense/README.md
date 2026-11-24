@@ -17,9 +17,11 @@
 
 範例自己的東西在 `features/`：地圖（map）、蓋東西（builder）、塔（tower）、怪物掛件（enemy_traits）、砲塔掛件（tower_traits）、做好的怪（enemies）、基地（base）、畫面上的東西（hud）。
 
-## 地圖編輯器（開發者用）
+## 塔防編輯器（開發者用）
 
-打開 `map_editor/map_editor.tscn` 按 `F6`：
+打開 `map_editor/map_editor.tscn` 按 `F6`。上面有三頁：**地圖、波次、怪物**，共用上一步／下一步和「▶ 試玩」（用現在畫的地圖＋現在排的波次）。「存檔」變黃、多一個＊，表示有東西還沒存。
+
+### 地圖頁
 
 | 想做 | 怎麼做 |
 | --- | --- |
@@ -40,6 +42,26 @@
 範例地圖：`maps/default.tres`（迷宮型，一個出怪口、一個基地）、`maps/two_gates.tres`（迷宮型，兩個出怪口、兩個基地）、`maps/fixed_route.tres`（固定路線型：彎彎的路，塔只能蓋在路旁的高地，不能蓋牆）。
 
 > 存檔是寫進專案資料夾，只有在 Godot 編輯器裡按 F6 才能存。存完回到 Godot 編輯器，`maps/` 裡就會出現新的檔案。
+
+### 波次頁
+
+一列是一種怪，一波可以混好幾種一起出。存成 `waves/名稱.tres`，跟地圖分開，可以換著配。
+
+| 想做 | 怎麼做 |
+| --- | --- |
+| 多一波、複製、換順序 | 「＋ 新的一波」「複製」「▲▼」 |
+| 一波混好幾種怪 | 那一波按「＋ 同時出」 |
+| 出什麼怪、幾隻、隔幾秒、從哪個出怪口 | 直接改那一列（出怪口的號碼跟地圖上的一樣） |
+| 這一波的血量、速度 | 填數字；`0`＝用怪自己的。右邊的 `→` 是掛件算完的**實際數字**（例如填 6、厚血 ×3 → 18，裝甲減半 → 要打 36） |
+| 第一波前等幾秒、兩波之間等幾秒 | 「開場等」「兩波之間等」（出完最後一隻才開始算） |
+| 只測後面的波次 | 「▶ 從這波試玩」（前面幾波的錢會先給） |
+| 關卡換波次 | 打開 `levels/tower_defense.tscn`，點 `Spawner`，把 `waves/` 裡的檔案拖進 Wave Table |
+
+### 怪物頁
+
+改怪的名字、顏色、數值，**掛件用勾的**，旁邊有預覽和實際數字。存成 `features/enemies/` 裡的一般場景（繼承 `walker.tscn`＋掛件），要在 Godot 裡開來改也可以。普通怪是尋路積木本身，不能改，按「複製成新怪」拿來改。要刪掉一隻怪，在 Godot 的檔案系統刪。
+
+> 怪物存檔時如果 Godot 編輯器正開著那個場景，回到編輯器會問要不要重新載入，選「重新載入」。
 
 ## 迷宮型、固定路線型
 
@@ -82,7 +104,7 @@
 | 想要 | 怎麼設 |
 | --- | --- |
 | 怪輪流從每個出怪口出來 | 什麼都不用改（預設） |
-| 這一波從某個出怪口出來 | 點 `Spawner`，在那一波的 Spawn Point 填第幾個出怪口（0＝輪流） |
+| 這一波從某個出怪口出來 | 編輯器的波次頁，那一列的「出怪口」選第幾個 |
 | 每個出怪口各自一份波次表 | 多放幾個 `Spawner`（`addons/ngdc_pathfinding/spawner/spawner.tscn`），都拖進 `MapLoader` 的 Spawners；第 1 個出怪口給第 1 個生怪器，以此類推。全部打完才算贏 |
 | 基地共用一條血（預設） | `BaseGroup` 的 Mode 選「共用一條血」，血量看 Shared Max Health |
 | 每個基地各自的血，一個被打爆就輸 | Mode 選「各自的血：一個被打爆就輸」，血量看 `features/base/base.tscn` 的 Max Health |
@@ -115,8 +137,8 @@
 | --- | --- |
 | 地圖 | 用地圖編輯器畫，再把地圖拖進 `MapLoader` 的 Map |
 | 鏡頭 | 點 `PanCamera`：要不要鍵盤／滑鼠邊緣／中鍵移動、移動速度、縮放範圍 |
-| 波次 | 點 `Spawner`，在「Waves」改每一波出什麼怪（Enemy Scene）、幾隻、間隔、速度、血量；按「＋」多一波 |
-| 新的怪 | 把 `addons/ngdc_pathfinding/spawner/walker.tscn` 拖進場景，掛上幾個怪物掛件，改顏色，存成新場景，拖進波次的 Enemy Scene |
+| 波次 | 用編輯器的「波次」頁（或點 `Spawner` 的 Wave Table，在檢查器改） |
+| 怪、新的怪 | 用編輯器的「怪物」頁（或在 Godot 打開 `features/enemies/` 的場景） |
 | 新的塔 | 打開 `features/tower/tower.tscn` 另存新檔，掛上砲塔掛件，改名字（Display Name）、價錢、射程、傷害、攻速、顏色；再加進 `Builder` 的 Tower Scenes |
 | 塔先打誰 | 點塔的 Target Priority：離塔最近／最接近基地／血最多／血最少 |
 | 牆的價錢、起始金錢 | `Builder` 的 Wall Cost；`HUD/Info/Money` 的 Score |
@@ -133,5 +155,5 @@
 
 ## 給會寫程式的人：做新的掛件
 
-- 怪物掛件：`extends EnemyTrait`，在 `apply()` 裡改 `walker` 的數值（`speed`、`max_health`、`damage_taken_multiplier`……），或接 `walker.died`
+- 怪物掛件：`extends EnemyTrait`，在 `apply()` 裡改 `walker` 的數值（`speed`、`max_health`、`damage_taken_multiplier`……），或接 `walker.died`；想在編輯器的怪物頁顯示中文，覆寫 `trait_name()`、`labels()`
 - 砲塔掛件：`extends TowerTrait`，覆寫 `apply()`（改 `tower` 的數值）或 `on_hit(敵人, 傷害)`（每打到一隻怪做什麼）

@@ -14,6 +14,14 @@ var _timer: float = 0.0
 var _pulse: float = 0.0
 
 
+func trait_name() -> String:
+	return "治療"
+
+
+func labels() -> Dictionary:
+	return {"heal_range": "補多遠", "amount": "一次補幾滴", "interval": "隔幾秒補"}
+
+
 func apply() -> void:
 	_timer = interval
 

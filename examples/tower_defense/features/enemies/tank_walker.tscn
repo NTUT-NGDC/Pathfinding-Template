@@ -5,6 +5,7 @@
 [ext_resource type="PackedScene" path="res://examples/tower_defense/features/enemy_traits/armor.tscn" id="3_armor"]
 
 [node name="TankWalker" instance=ExtResource("1_walker")]
+display_name = "坦克"
 color = Color(0.45, 0.35, 0.6, 1)
 
 [node name="Tank" parent="." instance=ExtResource("2_tank")]

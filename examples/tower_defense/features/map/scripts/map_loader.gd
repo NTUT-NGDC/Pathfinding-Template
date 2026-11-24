@@ -28,10 +28,16 @@ signal map_ready()
 
 ## 地圖編輯器按「試玩」時放在這裡，關卡就用這張，不用 Map 欄位那張
 static var test_map: TDMap
+## 試玩用的波次（不用生怪器自己的）、從第幾波開始、多給多少錢（前面幾波本來會賺的）
+static var test_waves: WaveTable
+static var test_start_wave: int = 1
+static var test_money: int = 0
 ## 是不是地圖編輯器裡的試玩
 var is_test_play: bool = false
 ## 放好的基地
 var bases: Array[Node2D] = []
+
+var _bonus: int = 0
 
 const SPAWN_POINT: PackedScene = preload("res://examples/tower_defense/features/map/spawn_point.tscn")
 ## 地板用 TileSet 的哪一格
@@ -52,6 +58,16 @@ func _ready() -> void:
 		map = test_map
 		test_map = null
 		is_test_play = true
+	if test_waves != null:
+		for spawner: Spawner in spawners:
+			if spawner != null:
+				spawner.wave_table = test_waves                   # 生怪器這一幀結束才開始，現在換還來得及
+				spawner.start_wave = test_start_wave
+				break
+		_bonus = test_money
+		test_waves = null
+		test_start_wave = 1
+		test_money = 0
 	_apply.call_deferred()
 
 
@@ -86,6 +102,11 @@ func _apply() -> void:
 	var group: BaseGroup = get_tree().get_first_node_in_group("base_group") as BaseGroup
 	if group != null:
 		group.refresh()                                           # 基地是剛剛才放的：血條照基地規則顯示
+	if _bonus > 0:
+		var money: ScoreDisplay = get_tree().get_first_node_in_group("score") as ScoreDisplay
+		if money != null:
+			money.add(_bonus)
+		_bonus = 0
 	map_ready.emit()
 
 

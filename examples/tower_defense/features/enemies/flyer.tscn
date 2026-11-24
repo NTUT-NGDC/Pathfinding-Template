@@ -4,6 +4,7 @@
 [ext_resource type="PackedScene" path="res://examples/tower_defense/features/enemy_traits/flying.tscn" id="2_flying"]
 
 [node name="Flyer" instance=ExtResource("1_walker")]
+display_name = "飛行怪"
 color = Color(0.55, 0.8, 0.95, 1)
 
 [node name="Flying" parent="." instance=ExtResource("2_flying")]

@@ -2,13 +2,8 @@
 
 [ext_resource type="TileSet" path="res://addons/ngdc_pathfinding/grid/tileset/tileset.tres" id="1_af8b6"]
 [ext_resource type="PackedScene" path="res://addons/ngdc_pathfinding/grid/path_grid.tscn" id="2_ray8a"]
+[ext_resource type="Resource" path="res://examples/tower_defense/waves/default.tres" id="4_02jmx"]
 [ext_resource type="PackedScene" path="res://addons/ngdc_pathfinding/spawner/spawner.tscn" id="4_qquge"]
-[ext_resource type="Script" path="res://addons/ngdc_pathfinding/spawner/scripts/wave.gd" id="6_obutl"]
-[ext_resource type="PackedScene" path="res://examples/tower_defense/features/enemies/fast_walker.tscn" id="7_20w2n"]
-[ext_resource type="PackedScene" path="res://examples/tower_defense/features/enemies/splitter.tscn" id="8_xoj28"]
-[ext_resource type="PackedScene" path="res://examples/tower_defense/features/enemies/flyer.tscn" id="9_06svx"]
-[ext_resource type="PackedScene" path="res://examples/tower_defense/features/enemies/tank_walker.tscn" id="10_xbvsg"]
-[ext_resource type="PackedScene" path="res://examples/tower_defense/features/enemies/healer_walker.tscn" id="11_48fo8"]
 [ext_resource type="PackedScene" path="res://core/camera/pan_camera.tscn" id="12_vva8o"]
 [ext_resource type="PackedScene" path="res://examples/tower_defense/features/map/map_loader.tscn" id="14_3mvfm"]
 [ext_resource type="Resource" path="res://examples/tower_defense/maps/default.tres" id="16_ip3to"]
@@ -19,50 +14,6 @@
 [ext_resource type="PackedScene" path="res://examples/tower_defense/features/hud/base_label.tscn" id="25_r1sh2"]
 [ext_resource type="PackedScene" path="res://examples/tower_defense/features/hud/build_bar.tscn" id="27_nprd4"]
 [ext_resource type="PackedScene" path="res://examples/tower_defense/features/hud/speed_button.tscn" id="29_4ftha"]
-
-[sub_resource type="Resource" id="Resource_6pyvj"]
-script = ExtResource("6_obutl")
-count = 6
-interval = 1.2
-speed = 50.0
-health = 3.0
-
-[sub_resource type="Resource" id="Resource_03x1d"]
-script = ExtResource("6_obutl")
-enemy_scene = ExtResource("7_20w2n")
-count = 6
-interval = 0.9
-health = 3.0
-
-[sub_resource type="Resource" id="Resource_p8s74"]
-script = ExtResource("6_obutl")
-enemy_scene = ExtResource("8_xoj28")
-interval = 1.4
-speed = 45.0
-health = 6.0
-
-[sub_resource type="Resource" id="Resource_gdl5p"]
-script = ExtResource("6_obutl")
-enemy_scene = ExtResource("9_06svx")
-count = 6
-speed = 45.0
-health = 4.0
-
-[sub_resource type="Resource" id="Resource_ih8gs"]
-script = ExtResource("6_obutl")
-enemy_scene = ExtResource("10_xbvsg")
-count = 4
-interval = 2.0
-speed = 40.0
-health = 6.0
-
-[sub_resource type="Resource" id="Resource_s6n27"]
-script = ExtResource("6_obutl")
-enemy_scene = ExtResource("11_48fo8")
-count = 4
-interval = 1.5
-speed = 45.0
-health = 8.0
 
 [node name="TowerDefense" type="Node2D" unique_id=1363152569]
 position = Vector2(64, 48)
@@ -81,9 +32,7 @@ diagonal = 0
 
 [node name="Spawner" parent="." unique_id=583726812 instance=ExtResource("4_qquge")]
 position = Vector2(48, 272)
-waves = Array[ExtResource("6_obutl")]([SubResource("Resource_6pyvj"), SubResource("Resource_03x1d"), SubResource("Resource_p8s74"), SubResource("Resource_gdl5p"), SubResource("Resource_ih8gs"), SubResource("Resource_s6n27")])
-time_between_waves = 6.0
-start_delay = 5.0
+wave_table = ExtResource("4_02jmx")
 lose_when_reached = false
 
 [node name="PanCamera" parent="." unique_id=1045693596 instance=ExtResource("12_vva8o")]

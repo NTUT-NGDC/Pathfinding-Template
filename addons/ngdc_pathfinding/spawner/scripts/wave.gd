@@ -12,5 +12,7 @@ extends Resource
 @export_range(0, 500, 5, "suffix:px/s") var speed: float = 0.0
 ## 敵人血量；0＝用敵人場景自己的血量
 @export_range(0, 1000, 1) var health: float = 0.0
+## 跟上一列算同一波、同時出（一波混好幾種怪）
+@export var with_previous: bool = false
 ## 從第幾個出怪口出：0＝輪流，1＝生怪器自己，2 以後＝生怪器的 More Spawn Points
 @export_range(0, 20, 1) var spawn_point: int = 0

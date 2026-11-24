@@ -7,6 +7,14 @@ extends EnemyTrait
 @export_range(1.0, 5.0, 0.1) var speed_multiplier: float = 1.6
 
 
+func trait_name() -> String:
+	return "加速"
+
+
+func labels() -> Dictionary:
+	return {"speed_multiplier": "速度 ×"}
+
+
 func apply() -> void:
 	walker.speed *= speed_multiplier
 

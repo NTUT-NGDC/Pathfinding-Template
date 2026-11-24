@@ -237,6 +237,40 @@ func _test_spawner() -> void:
 	_expect(reached[0] == 3, "3 隻都走到基地（%d）" % reached[0])
 	_expect(cleared[0], "全部出完、場上沒怪：all_cleared")
 
+	# 波次檔、一波混好幾種、從第幾波開始
+	var table: WaveTable = WaveTable.new()
+	table.start_delay = 0.1
+	table.time_between_waves = 0.1
+	for count: int in [1, 2, 3, 1]:
+		var row: Wave = Wave.new()
+		row.count = count
+		row.interval = 0.1
+		row.speed = 400.0
+		table.waves.append(row)
+	table.waves[2].with_previous = true
+	_expect(table.groups().size() == 3 and table.groups()[1].size() == 2, "With Previous：兩列算同一波（%d 波）" % table.groups().size())
+	var copied: WaveTable = table.copy()
+	copied.waves[0].count = 9
+	_expect(table.waves[0].count == 1, "copy()：改複製的不會動到原本的")
+	var second: Spawner = Spawner.new()
+	second.position = _center(Vector2i(1, 2))
+	second.target = base
+	second.waves = [wave]
+	second.wave_table = table
+	second.start_wave = 2
+	second.lose_when_reached = false
+	second.win_when_cleared = false
+	var second_started: Array[int] = []
+	var counts: Array[int] = [0]
+	var done: Array[bool] = [false]
+	second.wave_started.connect(func(n: int) -> void: second_started.append(n))
+	second.spawned.connect(func(_e: Node2D) -> void: counts[0] += 1)
+	second.all_cleared.connect(func() -> void: done[0] = true)
+	_level.add_child(second)
+	await _wait_until(func() -> bool: return done[0], 900)
+	_expect(second_started == [2, 3] and counts[0] == 6 and done[0], "Wave Table：從第 2 波開始、同一波兩種一起出，共 6 隻（%s、%d 隻）" % [second_started, counts[0]])
+	second.queue_free()
+
 	# 打死的怪也算
 	var walker: Walker = WALKER_SCENE.instantiate()
 	walker.max_health = 5.0

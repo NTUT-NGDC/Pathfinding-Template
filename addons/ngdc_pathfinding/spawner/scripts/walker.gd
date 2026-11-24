@@ -10,6 +10,8 @@ extends Node2D
 ## 被打死了
 signal died(walker: Walker)
 
+## 名字（塔防的編輯器裡顯示）
+@export var display_name: String = "普通怪"
 ## 走路速度（像素／秒）
 @export_range(10, 500, 5, "suffix:px/s") var speed: float = 60.0:
 	set(value):

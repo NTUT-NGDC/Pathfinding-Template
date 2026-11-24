@@ -1,5 +1,11 @@
 extends Node2D
-## 塔防地圖編輯器（開發者用）：打開 map_editor.tscn 按 F6。
+## 塔防編輯器（開發者用）：打開 map_editor.tscn 按 F6。上面三頁：
+##   ・地圖：下面說的這些
+##   ・波次：一波一波出什麼怪（wave_page.gd），存成 waves/名稱.tres，拖進關卡 Spawner 的 Wave Table
+##   ・怪物：改怪的數值、掛件（enemy_page.gd），存成 features/enemies/ 的場景
+## 三頁共用上一步／下一步和試玩（試玩用現在畫的地圖＋現在排的波次）。
+##
+## 地圖頁：
 ##   ・下面第一排選要畫什麼：岩石（怪不能走、不能蓋）、沼澤（怪走得慢）、高地（怪不能走、可以蓋塔）、
 ##     出怪口、基地（出怪口、基地可以放好幾個）
 ##   ・畫地形可以選工具：畫筆、矩形、圓形（拖曳畫出形狀）、油漆桶（把相連的一整塊換掉）
@@ -23,6 +29,8 @@ const MAX_BRUSH: float = 120.0
 ## 上一步最多記幾步
 const MAX_HISTORY: int = 50
 
+enum Page { MAP, WAVES, ENEMIES }
+const PAGE_NAMES: Array[String] = ["地圖", "波次", "怪物"]
 enum Tool { ROCK, SWAMP, HIGH, SPAWN, BASE }
 const TOOL_NAMES: Array[String] = ["岩石", "沼澤", "高地", "出怪口", "基地"]
 ## 畫地形的方式
@@ -33,6 +41,13 @@ const SHAPE_NAMES: Array[String] = ["畫筆", "矩形", "圓形", "油漆桶"]
 static var editing: TDMap
 ## 重新載入時要不要接著試玩（試玩中按了暫停選單的「重來」）
 static var resume_test: bool = false
+## 試玩從第幾波開始（重來的時候用一樣的）
+static var resume_wave: int = 1
+## 上次存檔（讀檔、新地圖）時的樣子，用來看有沒有東西還沒存
+static var saved_state: Dictionary = {}
+static var saved_name: String = ""
+## 現在在哪一頁
+static var page: Page = Page.MAP
 
 var map: TDMap
 var tool: Tool = Tool.ROCK
@@ -62,6 +77,14 @@ var _history: Array[Dictionary] = []
 var _future: Array[Dictionary] = []
 var _status: Label
 var _ui: CanvasLayer
+## 地圖頁的三排工具（換頁時藏起來）
+var _map_tools: Control
+var _wave_page: TDWavePage
+var _enemy_page: TDEnemyPage
+var _page_buttons: Array[Button] = []
+var _save_button: Button
+## 每隔一小段時間看一次有沒有東西還沒存
+var _check_time: float = 0.0
 var _stop_button: Button
 var _status_text: String = ""
 
@@ -70,6 +93,8 @@ func _ready() -> void:
 	Engine.time_scale = 1.0
 	map = editing if editing != null else _new_map()
 	map.ensure()
+	if editing == null:
+		_mark_saved()
 	editing = map
 	_view = TerrainView.new()
 	_view.name = "Terrain"
@@ -88,8 +113,9 @@ func _ready() -> void:
 	_set_shape(Shape.BRUSH)
 	_say("左鍵畫、右鍵擦、滾輪調筆刷大小、Ctrl＋滾輪縮放")
 	GameFlow.set_pause_enabled(false)                             # 編輯時不要暫停選單（試玩時才有）
+	set_page(page)
 	if resume_test:
-		start_test.call_deferred()
+		start_test.call_deferred(resume_wave)
 
 
 func _exit_tree() -> void:
@@ -131,6 +157,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		else:
 			return
 		get_viewport().set_input_as_handled()
+		return
+	if page != Page.MAP:
 		return
 	var button: InputEventMouseButton = event as InputEventMouseButton
 	if button != null:
@@ -293,8 +321,12 @@ func remember() -> void:
 	_future.clear()
 
 
-## 上一步（Ctrl＋Z）
+## 上一步（Ctrl＋Z）：看現在在哪一頁
 func undo() -> bool:
+	if page == Page.WAVES:
+		return _wave_page.undo()
+	if page == Page.ENEMIES:
+		return _enemy_page.undo()
 	if _history.is_empty():
 		_say("沒有上一步了")
 		return false
@@ -307,6 +339,10 @@ func undo() -> bool:
 
 ## 下一步（Ctrl＋Y）
 func redo() -> bool:
+	if page == Page.WAVES:
+		return _wave_page.redo()
+	if page == Page.ENEMIES:
+		return _enemy_page.redo()
 	if _future.is_empty():
 		_say("沒有下一步了")
 		return false
@@ -332,9 +368,32 @@ func check_map() -> String:
 	return ""
 
 
-func _process(_delta: float) -> void:
-	if not is_testing():
-		queue_redraw()                                            # 筆刷圓跟著滑鼠
+func _process(delta: float) -> void:
+	if is_testing():
+		return
+	queue_redraw()                                                # 筆刷圓跟著滑鼠
+	_check_time -= delta
+	if _check_time <= 0.0:
+		_check_time = 0.25
+		update_save_buttons()
+
+
+## 地圖有沒有東西還沒存
+func is_dirty() -> bool:
+	return _name_edit.text.strip_edges() != saved_name or map.snapshot() != saved_state
+
+
+## 記住現在的樣子是存過的
+func _mark_saved() -> void:
+	saved_state = map.snapshot()
+	saved_name = map.map_name
+
+
+## 三頁的「存檔」：有東西沒存就變黃、多一個＊
+func update_save_buttons() -> void:
+	TDEditorStyle.paint_save(_save_button, is_dirty())
+	_wave_page.update_save_button()
+	_enemy_page.update_save_button()
 
 
 func _draw() -> void:
@@ -345,6 +404,8 @@ func _draw() -> void:
 		_draw_marker(map.spawn_cells[i], Color(0.9, 0.3, 0.3), "出怪口" if map.spawn_cells.size() == 1 else "出怪口%d" % (i + 1))
 	for i: int in map.base_cells.size():
 		_draw_marker(map.base_cells[i], Color("4ab86a"), "基地" if map.base_cells.size() == 1 else "基地%d" % (i + 1))
+	if page != Page.MAP:
+		return
 	# 滑鼠：筆刷的圓、拖曳中的形狀、要放的格子
 	var at: Vector2 = map_position(get_viewport().get_mouse_position())
 	var white: Color = Color(1, 1, 1, 0.8)
@@ -385,6 +446,34 @@ func _draw_marker(cell: Vector2i, color: Color, text: String) -> void:
 	draw_string(get_window().get_theme_default_font(), center + Vector2(-24, -20), text, HORIZONTAL_ALIGNMENT_CENTER, 48, 12, color)
 
 
+# ---- 換頁 ----
+
+## 換到第幾頁：地圖、波次、怪物
+func set_page(to: int) -> void:
+	_commit_pages()
+	page = to as Page
+	_painting = false
+	_drag_from = null
+	_map_tools.visible = page == Page.MAP
+	_wave_page.visible = page == Page.WAVES
+	_enemy_page.visible = page == Page.ENEMIES
+	for i: int in _page_buttons.size():
+		_page_buttons[i].button_pressed = i == page
+	_camera.process_mode = Node.PROCESS_MODE_INHERIT if page == Page.MAP and not is_testing() else Node.PROCESS_MODE_DISABLED
+	if page == Page.WAVES:
+		_wave_page.spawn_count = map.spawn_cells.size()           # 出怪口的號碼跟地圖上的一樣
+		_wave_page.refresh()
+	_say(["左鍵畫、右鍵擦、滾輪調筆刷大小、Ctrl＋滾輪縮放",
+		"排好按「存檔」，再把 waves/ 裡的檔案拖進關卡 Spawner 的 Wave Table",
+		"改好按「存檔」，波次頁和試玩就會用新的"][page])
+	queue_redraw()
+
+
+func _commit_pages() -> void:
+	_wave_page.commit()
+	_enemy_page.commit()
+
+
 # ---- 試玩 ----
 
 ## 正在試玩嗎
@@ -392,16 +481,23 @@ func is_testing() -> bool:
 	return _play != null and is_instance_valid(_play)
 
 
-## 開始試玩：在編輯器裡放一個塔防關卡，用這張地圖
-func start_test() -> bool:
+## 開始試玩：在編輯器裡放一個塔防關卡，用這張地圖、這份波次（from_wave：從第幾波開始，前面幾波的錢先給）
+func start_test(from_wave: int = 1) -> bool:
 	if is_testing():
 		return false
+	_commit_pages()
 	if not check_map().is_empty():
 		_say(check_map() + "才能試玩")
 		resume_test = false
 		return false
 	map.map_name = _name_edit.text.strip_edges()                  # 還沒存檔也記住名字
 	MapLoader.test_map = map.duplicate(true) as TDMap
+	MapLoader.test_waves = _wave_page.table.copy()
+	MapLoader.test_start_wave = from_wave
+	MapLoader.test_money = _wave_page.money_before(from_wave)
+	resume_wave = from_wave
+	if TDEnemyPage.dirty:
+		_say("提醒：怪物「%s」改了還沒存檔，試玩用的是存過的" % TDEnemyPage.editing.get("display_name", ""))
 	_play = LEVEL.instantiate()
 	add_child(_play)
 	resume_test = true                                            # 暫停選單按「重來」：重新載入後接著試玩
@@ -430,7 +526,7 @@ func _set_editing(on: bool) -> void:
 	GameFlow.set_pause_enabled(not on)                            # 編輯時不要暫停選單（試玩時才有）
 	_view.visible = on
 	_ui.visible = on
-	_camera.process_mode = Node.PROCESS_MODE_INHERIT if on else Node.PROCESS_MODE_DISABLED
+	_camera.process_mode = Node.PROCESS_MODE_INHERIT if on and page == Page.MAP else Node.PROCESS_MODE_DISABLED
 	_stop_button.visible = not on
 	queue_redraw()
 
@@ -454,6 +550,8 @@ func save_map() -> String:
 		_say("存檔失敗：%s（匯出的遊戲不能存，要在 Godot 編輯器裡按 F6）" % error_string(error))
 		return ""
 	map.take_over_path(path)
+	_mark_saved()
+	update_save_buttons()
 	_refresh_maps()
 	_say("存好了：%s" % path)
 	return path
@@ -468,6 +566,7 @@ func load_map(path: String) -> bool:
 	map = loaded
 	map.ensure()
 	editing = map
+	_mark_saved()
 	_forget()
 	_show_map()
 	_load_list.select(0)                                          # 清單回到「讀檔…」，同一張也能再讀一次
@@ -489,6 +588,7 @@ func map_files() -> PackedStringArray:
 func _new() -> void:
 	map = _new_map()
 	editing = map
+	_mark_saved()
 	_forget()
 	_show_map()
 	_say("新地圖")
@@ -500,7 +600,12 @@ func _build_ui() -> void:
 	_ui = CanvasLayer.new()
 	_ui.name = "UI"
 	add_child(_ui)
-	var row: HBoxContainer = _row(Vector2(64, 594))
+	_build_pages()
+	_map_tools = Control.new()
+	_map_tools.name = "MapTools"
+	_map_tools.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_ui.add_child(_map_tools)
+	var row: HBoxContainer = _row(Vector2(64, 594), _map_tools)
 	for i: int in TOOL_NAMES.size():
 		_tool_buttons.append(_toggle(row, TOOL_NAMES[i], _set_tool.bind(i)))
 	row.add_child(VSeparator.new())
@@ -509,24 +614,20 @@ func _build_ui() -> void:
 	row.add_child(VSeparator.new())
 	_width = _size_box(row, "寬")
 	_height = _size_box(row, "高")
-	row = _row(Vector2(64, 628))                                  # 第二排：上一步、檔案、試玩
-	_button(row, "↶", undo).tooltip_text = "上一步（Ctrl＋Z）"
-	_button(row, "↷", redo).tooltip_text = "下一步（Ctrl＋Y）"
-	row.add_child(VSeparator.new())
+	row = _row(Vector2(64, 628), _map_tools)                      # 第二排：檔案
 	_name_edit = LineEdit.new()
 	_name_edit.placeholder_text = "地圖名稱"
 	_name_edit.custom_minimum_size = Vector2(160, 0)
 	row.add_child(_name_edit)
-	_button(row, "存檔", save_map)
+	_save_button = _button(row, "存檔", save_map)
+	TDEditorStyle.paint_save(_save_button, false)
 	_load_list = OptionButton.new()
 	_load_list.custom_minimum_size = Vector2(160, 0)
 	_load_list.item_selected.connect(func(index: int) -> void: load_map(_load_list.get_item_metadata(index)))
 	row.add_child(_load_list)
 	_button(row, "新地圖", _new)
-	_button(row, "清空地形", clear_terrain)
-	row.add_child(VSeparator.new())
-	_button(row, "▶ 試玩", start_test)
-	row = _row(Vector2(64, 662))                                  # 第三排：哪種地面可以蓋塔、蓋牆
+	TDEditorStyle.paint(_button(row, "清空地形", clear_terrain), TDEditorStyle.DANGER)
+	row = _row(Vector2(64, 662), _map_tools)                      # 第三排：哪種地面可以蓋塔、蓋牆
 	_tower_checks = _ground_checks(row, "塔可以蓋在：", false)
 	row.add_child(VSeparator.new())
 	_wall_checks = _ground_checks(row, "牆可以蓋在：", true)
@@ -535,10 +636,18 @@ func _build_ui() -> void:
 	_status.add_theme_font_size_override("font_size", 14)
 	_ui.add_child(_status)
 	var title: Label = Label.new()
-	title.text = "塔防地圖編輯器"
+	title.text = "塔防編輯器"
 	title.position = Vector2(64, 10)
 	title.add_theme_font_size_override("font_size", 22)
 	_ui.add_child(title)
+	row = _row(Vector2(200, 8), _ui)                              # 最上面：換頁、上一步、試玩
+	for i: int in PAGE_NAMES.size():
+		_page_buttons.append(_toggle(row, PAGE_NAMES[i], set_page.bind(i)))
+	row.add_child(VSeparator.new())
+	_button(row, "↶", undo).tooltip_text = "上一步（Ctrl＋Z）"
+	_button(row, "↷", redo).tooltip_text = "下一步（Ctrl＋Y）"
+	row.add_child(VSeparator.new())
+	TDEditorStyle.paint(_button(row, "▶ 試玩", start_test), TDEditorStyle.PLAY)
 	# 試玩時才出現的「停止試玩」（另一層，編輯的介面藏起來時它還在）
 	var top: CanvasLayer = CanvasLayer.new()
 	top.layer = 25                                                # 在 HUD（20）上面、暫停選單（30）下面
@@ -550,14 +659,41 @@ func _build_ui() -> void:
 	_stop_button.position = Vector2(940, 22)
 	_stop_button.visible = false
 	_stop_button.pressed.connect(stop_test)
+	TDEditorStyle.paint(_stop_button, TDEditorStyle.DANGER)
 	top.add_child(_stop_button)
 
 
-func _row(at: Vector2) -> HBoxContainer:
+## 波次頁（右邊，左邊看得到地圖上的出怪口）、怪物頁（整個畫面）
+func _build_pages() -> void:
+	_wave_page = TDWavePage.new()
+	_wave_page.name = "WavePage"
+	_wave_page.say = _say
+	_wave_page.test_requested.connect(func(wave_number: int) -> void: start_test(wave_number))
+	_add_page(_wave_page, Rect2(220, 48, 1040, 640))
+	_enemy_page = TDEnemyPage.new()
+	_enemy_page.name = "EnemyPage"
+	_enemy_page.say = _say
+	_enemy_page.saved.connect(func(_path: String) -> void: _wave_page.refresh())
+	_add_page(_enemy_page, Rect2(64, 48, 1196, 640))
+
+
+func _add_page(panel: PanelContainer, area: Rect2) -> void:
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = Color(0.16, 0.16, 0.18)
+	style.set_corner_radius_all(6)
+	style.set_content_margin_all(12)
+	panel.add_theme_stylebox_override("panel", style)
+	panel.visible = false
+	_ui.add_child(panel)
+	panel.position = area.position
+	panel.size = area.size
+
+
+func _row(at: Vector2, parent: Node) -> HBoxContainer:
 	var row: HBoxContainer = HBoxContainer.new()
 	row.position = at
 	row.add_theme_constant_override("separation", 6)
-	_ui.add_child(row)
+	parent.add_child(row)
 	return row
 
 
@@ -573,6 +709,7 @@ func _button(parent: Control, text: String, action: Callable) -> Button:
 func _toggle(parent: Control, text: String, action: Callable) -> Button:
 	var button: Button = _button(parent, text, action)
 	button.toggle_mode = true
+	TDEditorStyle.paint_toggle(button)
 	return button
 
 
@@ -638,6 +775,9 @@ func _say(text: String = "") -> void:
 	if not text.is_empty():
 		_status_text = text
 	if _status == null:
+		return
+	if page != Page.MAP:
+		_status.text = _status_text
 		return
 	var what: String = TOOL_NAMES[tool] + ("（%s）" % SHAPE_NAMES[shape] if _is_terrain_tool() else "")
 	_status.text = "%s　｜　筆刷 %d px　｜　%s" % [what, int(brush), _status_text]
