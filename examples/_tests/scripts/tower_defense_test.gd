@@ -813,6 +813,9 @@ func _test_wave_page() -> void:
 	# 從第 2 波試玩：用這份波次、補前面幾波的錢
 	var bonus: int = page.money_before(2)
 	page.test_requested.emit(2)
+	var ask: ConfirmationDialog = editor.get("_ask")
+	_expect(ask.visible and ask.dialog_text.contains("波次"), "波次沒存就試玩：先問")
+	ask.custom_action.emit(&"skip")                               # 不存，直接試玩
 	await _frames(4)
 	Engine.time_scale = TIME_SCALE
 	var play: Node = editor.get("_play")
@@ -899,6 +902,11 @@ func _test_enemy_page() -> void:
 	page.open(tank_path)
 	editor.call("undo")
 	_expect(page.path.is_empty() and page.data["display_name"] == "_測試怪", "沒存檔就換到別隻：上一步拿得回來")
+	_expect(page.delete_scene() and not page.path.is_empty(), "還沒存過的：刪掉＝丟掉草稿")
+	page.open(tank_path)
+	_expect(not page.delete_scene() and FileAccess.file_exists(tank_path), "波次有用到的怪不能刪（%s）" % page.delete_problem())
+	page.open(TDEnemyInfo.DEFAULT_PATH)
+	_expect(not page.delete_scene() and (page.get("_delete_button") as Button).disabled, "普通怪不能刪")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 
 	# 範例的怪讀出來再存，內容不會變

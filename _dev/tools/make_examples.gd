@@ -133,7 +133,7 @@ func _build_chase() -> Node2D:
 		killer.add_child(marker)
 		marker.owner = _root
 	# 追丟人時在腳下放捕獸夾
-	_add((load("res://examples/chase/features/trap/trap_dropper.tscn") as PackedScene).instantiate(), "TrapDropper", killer)
+	_add((load("res://examples/chase/features/enemy_traits/trap_dropper.tscn") as PackedScene).instantiate(), "TrapDropper", killer)
 	# 守在工作室的那一隻：沒有巡邏點，站著張望；比較慢反應
 	var guard: ChaseAI = _instance("res://addons/ngdc_pathfinding/chase_ai/chase_ai.tscn", "Guard", guard_at, counts)
 	guard.start_angle = 180.0

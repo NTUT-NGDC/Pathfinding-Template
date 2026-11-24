@@ -174,6 +174,17 @@ func remember() -> void:
 	_future.clear()
 
 
+## 有沒有用到這種怪
+func uses(path: String) -> bool:
+	return table.waves.any(func(row: Wave) -> bool: return row.enemy_scene != null and row.enemy_scene.resource_path == path)
+
+
+## 上一步都不要了（有怪被刪掉，退回去會用到不在的怪）
+func forget_history() -> void:
+	_history.clear()
+	_future.clear()
+
+
 func undo() -> bool:
 	if _history.is_empty():
 		say.call("沒有上一步了")

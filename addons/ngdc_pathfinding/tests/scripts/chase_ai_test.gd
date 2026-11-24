@@ -108,6 +108,14 @@ func _test_vision() -> void:
 	for point: Vector2 in cone.slice(1):
 		shortest = minf(shortest, point.length())
 	_expect(shortest < 100.0, "視野錐被牆切掉（最短 %.0f px）" % shortest)
+	var seen_from: Node2D = Node2D.new()
+	seen_from.position = eye.position + Vector2(10, 0)
+	_level.add_child(seen_from)
+	vision.view_distance = 0.0
+	_expect(not vision.can_see(seen_from), "看多遠＝0：就在旁邊也看不到")
+	vision.view_distance = 260.0
+	_expect(vision.can_see(seen_from), "調回來就看得到")
+	seen_from.free()
 
 
 func _sees(vision: VisionSensor, at: Vector2) -> bool:

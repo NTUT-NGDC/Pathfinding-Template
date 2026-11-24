@@ -92,7 +92,9 @@ game_config.tres   遊戲名稱、關卡（Levels）、Credits 名單
 | 想改 | 看哪裡 |
 | --- | --- |
 | 追逐：新的目標、新的互動物件 | 照 `features/task_point/`（「目標」接口寫在 README 最下面），放在自己的資料夾 `features/名字/名字.tscn`；按 E 的東西掛 `features/interact/scripts/interactable.gd` |
-| 追逐：關卡 | 用編輯器（`map_editor/`）或直接改 `levels/*.tscn`，兩邊可以輪流。自己的物件放 `features/名字/名字.tscn`，編輯器的「其他」會列出來 |
+| 追逐：新的敵人、任務點……的種類 | 用編輯器的「敵人」「物件」頁，或寫一個繼承底的場景：敵人放 `features/enemies/`（繼承 `chase_ai.tscn`），其他放 `features/名字/kinds/`；名字寫 `metadata/display_name`，只寫跟底不一樣的欄位（看 `features/enemies/hound.tscn`） |
+| 追逐：新的敵人特性 | 照 `features/enemy_traits/trap_dropper.tscn`，一個特性＝一個場景＋一支腳本（`trait_name()`、`description()`、`labels()`），敵人頁會自動列出來 |
+| 追逐：關卡 | 用編輯器（`map_editor/`）或直接改 `levels/*.tscn`，兩邊可以輪流。自己的物件放 `features/名字/名字.tscn`，編輯器的「自製」會列出來 |
 | 塔防：新的怪物掛件、砲塔掛件 | 照 `features/enemy_traits/`、`features/tower_traits/` 裡現成的，一個掛件＝一個場景＋一支腳本，編輯器會自動列出來 |
 | 塔防：蓋東西、升級的規則 | `features/builder/scripts/builder.gd`、`features/tower/scripts/` |
 | 戰棋：新的特性 | 照 `features/unit_traits/`，繼承 `UnitTrait`，覆寫需要的函式（`modify_attack()`、`turn_started()`、`after_attack()`……），編輯器會自動列出來。中毒、燃燒這種掛在對方身上的狀態看戰棋 README 最下面 |
@@ -100,9 +102,9 @@ game_config.tres   遊戲名稱、關卡（Levels）、Credits 名單
 | 戰棋：電腦怎麼決定 | `features/battle/scripts/battle_ai.gd` |
 | 戰棋：輪流、扣血、勝負 | `features/battle/scripts/tactics_battle.gd`（很長，先搜尋函式名稱）；動畫在 `battle_effects.gd`、箭頭和記號在 `battle_marks.gd` |
 | 戰棋：新的地形 | `features/map/scripts/tactics_map.gd` 最上面的註解寫了要改哪幾個地方 |
-| 編輯器多一個欄位 | 戰棋小隊、規則：資料的腳本加 `@export`，再加到那一頁最上面的 `NUMBERS`。怪物、棋子：加到 `enemy_page.gd`／`unit_page.gd` 的 `fields` 和 `enemy_info.gd`／`unit_info.gd` 的欄位清單。追逐的物件、掛件、特性的欄位自動讀 `@export`，不用加 |
+| 編輯器多一個欄位 | 戰棋小隊、規則：資料的腳本加 `@export`，再加到那一頁最上面的 `NUMBERS`。怪物、棋子：加到 `enemy_page.gd`／`unit_page.gd` 的 `fields` 和 `enemy_info.gd`／`unit_info.gd` 的欄位清單。追逐的敵人、物件、掛件、特性的欄位自動讀 `@export`，不用加 |
 
-怪物、掛件、職業、特性的資料夾（`enemies/`、`enemy_traits/`、`tower_traits/`、`units/`、`unit_traits/`）**第一層的 `.tscn` 都會被編輯器列出來**，測試場景放子資料夾。
+怪物、掛件、職業、特性的資料夾（`enemies/`、`enemy_traits/`、`tower_traits/`、`units/`、`unit_traits/`、`kinds/`）**第一層的 `.tscn` 都會被編輯器列出來**，測試場景放子資料夾。
 
 **塔防、戰棋的地圖（`maps/*.tres`）不要用文字編輯，也不要整份讀**：地形存成編碼過的資料，一張幾十 KB。要看、要改地形先轉成文字：`godot --headless --path . res://core/level_editor/map_text.tscn -- export res://examples/tactics/maps/default.tres 檔案.txt`，改完把 `export` 換成 `import` 寫回去（圓滑的邊緣、小隊、規則都會留著；新地圖用 `new`，看 [關卡編輯器的 README](../core/level_editor/README.md)）。想畫得漂亮請使用者開 `map_editor/`。一張地圖同一時間只有一個人改，衝突時選一邊，不能合併。
 

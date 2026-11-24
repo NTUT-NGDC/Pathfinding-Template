@@ -1,0 +1,11 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://addons/ngdc_pathfinding/chase_ai/chase_ai.tscn" id="1_base"]
+
+[node name="Guard" instance=ExtResource("1_base")]
+view_distance = 300.0
+patrol_speed = 60.0
+chase_speed = 130.0
+reaction_time = 1.5
+body_color = Color(0.5411765, 0.22745098, 0.6901961, 1)
+metadata/display_name = "守衛"

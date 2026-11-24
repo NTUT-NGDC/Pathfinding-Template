@@ -37,6 +37,7 @@ func _ready() -> void:
 	await _test_pan_camera()
 	_test_audio_and_save()
 	await _test_level_editor()
+	await _test_tool_categories()
 	await _test_flow()
 
 	_failures += _script_errors.report()
@@ -177,6 +178,42 @@ func _physics_frames(count: int) -> void:
 		await get_tree().physics_frame
 
 
+## 工具分類：最小範例加上分類
+class SortedEditor extends "res://core/level_editor/sample/scripts/sample_editor.gd":
+	var box: HBoxContainer
+
+	func _setup() -> void:
+		super()
+		tools[0]["category"] = "地形"
+		tools[2]["category"] = "物件"
+		add_category("地形")
+		add_category("物件")
+		add_category("空的")
+
+	func _build_rows() -> void:
+		var row: HBoxContainer = add_category_rows()
+		box = add_category_box(row, ["地形", "空的"])
+		add_shape_buttons(box)
+		add_file_controls(add_row(660))
+
+
+func _test_tool_categories() -> void:
+	var editor: SortedEditor = SortedEditor.new()
+	add_child(editor)
+	await get_tree().physics_frame
+	var buttons: Dictionary[int, Button] = editor.get("_tool_buttons")
+	_expect(editor.category == "地形" and buttons[0].visible and buttons[1].visible and not buttons[2].visible and editor.box.visible, "工具分類：只看得到這一類，沒分類的一直都在")
+	editor.set_category("物件")
+	_expect(editor.tool == 2 and not buttons[0].visible and not editor.box.visible, "工具分類：換一類，用那一類的工具")
+	editor.set_tool(1)
+	_expect(editor.category == "物件", "工具分類：用沒分類的工具不會換分類")
+	editor.set_category("空的")
+	_expect(editor.tool == 1 and editor.box.visible, "工具分類：沒有工具的分類，用沒分類的那個")
+	editor.queue_free()
+	LevelEditor.forget_sessions()
+	await get_tree().physics_frame
+
+
 ## 關卡編輯器的底：畫、放、上一步、存讀、自動表單、試玩、做成關卡
 func _test_level_editor() -> void:
 	var editor: LevelEditor = (load("res://core/level_editor/sample/sample_editor.tscn") as PackedScene).instantiate()
@@ -223,6 +260,28 @@ func _test_level_editor() -> void:
 	made.free()
 	editor.new_map()
 	_expect(editor.load_map(path) and (editor.map as SampleMap).snapshot() == saved, "編輯器：讀回來一模一樣")
+	editor.request_test()
+	_expect(editor.is_testing() and not (editor.get("_ask") as ConfirmationDialog).visible, "編輯器：都存好了，按試玩直接開始")
+	editor.stop_test()
+	await get_tree().process_frame
+	var old_speed: float = (editor.map as SampleMap).speed
+	(editor.map as SampleMap).speed = 321.0
+	editor.request_test()
+	var ask: ConfirmationDialog = editor.get("_ask")
+	_expect(not editor.is_testing() and ask.visible and ask.dialog_text.contains("地圖"), "編輯器：沒存檔就按試玩，先問")
+	ask.hide()
+	ask.custom_action.emit(&"skip")
+	_expect(editor.is_testing() and editor.is_dirty(), "編輯器：不存，直接試玩")
+	editor.stop_test()
+	await get_tree().process_frame
+	editor.request_test()
+	ask.hide()
+	ask.confirmed.emit()
+	_expect(editor.is_testing() and not editor.is_dirty(), "編輯器：存檔並試玩")
+	editor.stop_test()
+	await get_tree().process_frame
+	(editor.map as SampleMap).speed = old_speed
+	editor.save_map()
 	_expect(editor.start_test() and editor.is_testing(), "編輯器：試玩")
 	await get_tree().physics_frame
 	var play: SampleLevel = editor.get("_play")

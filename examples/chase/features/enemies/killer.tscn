@@ -1,0 +1,9 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://addons/ngdc_pathfinding/chase_ai/chase_ai.tscn" id="1_base"]
+[ext_resource type="PackedScene" path="res://examples/chase/features/enemy_traits/trap_dropper.tscn" id="2_dropper"]
+
+[node name="Killer" instance=ExtResource("1_base")]
+metadata/display_name = "殺手"
+
+[node name="TrapDropper" parent="." instance=ExtResource("2_dropper")]

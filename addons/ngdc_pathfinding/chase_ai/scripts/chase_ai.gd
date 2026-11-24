@@ -36,8 +36,8 @@ const CONE_COLORS: Array[Color] = [
 	Color(1, 0.2, 0.2, 0.28), Color(1, 0.85, 0.2, 0.22)]
 
 @export_group("個性")
-## 看多遠（像素）
-@export_range(40, 800, 10, "suffix:px") var view_distance: float = 260.0:
+## 看多遠（像素）。0＝完全看不到，只靠聽的
+@export_range(0, 800, 10, "suffix:px") var view_distance: float = 260.0:
 	set(value):
 		view_distance = value
 		queue_redraw()
@@ -435,8 +435,9 @@ func _draw() -> void:
 func _draw_editor_preview() -> void:
 	var angle: float = deg_to_rad(view_angle)
 	var center: float = facing.angle()
-	draw_arc(Vector2.ZERO, view_distance, center - angle / 2.0, center + angle / 2.0, 32, Color(1, 1, 1, 0.4), 2.0)
-	if view_angle < 360.0:
+	if view_distance > 0.0:
+		draw_arc(Vector2.ZERO, view_distance, center - angle / 2.0, center + angle / 2.0, 32, Color(1, 1, 1, 0.4), 2.0)
+	if view_angle < 360.0 and view_distance > 0.0:
 		draw_line(Vector2.ZERO, Vector2.from_angle(center - angle / 2.0) * view_distance, Color(1, 1, 1, 0.4), 2.0)
 		draw_line(Vector2.ZERO, Vector2.from_angle(center + angle / 2.0) * view_distance, Color(1, 1, 1, 0.4), 2.0)
 	var previous: Vector2 = Vector2.ZERO

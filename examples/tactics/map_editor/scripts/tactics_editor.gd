@@ -9,15 +9,15 @@ extends LevelEditor
 ## 「做成關卡」：把存好的地圖做成一個關卡場景，再拖進 game_config.tres 的 Levels 就能串關。
 ##
 ## 地圖頁：畫筆、矩形、圓形、油漆桶，打開「對齊格子」就一格一格畫（兩種可以混用）。規則看格子中心在哪種地形裡。
-## 左鍵畫（放）、右鍵擦（拿掉）、滾輪調筆刷；WASD／滑鼠到邊緣／中鍵移動畫面、Ctrl＋滾輪縮放；
+## 工具分四類：地形、我方、敵人、物品（按 1～4 切換）。左鍵畫（放）、右鍵擦（拿掉）、滾輪調筆刷；WASD／滑鼠到邊緣／中鍵移動畫面、Ctrl＋滾輪縮放；
 ## Ctrl＋Z 上一步、Ctrl＋Y 下一步。
 ## 分頁、上一步、存檔、試玩這些共用的在 core/level_editor/，這裡只有戰棋自己的。
 
 enum Page { MAP, SQUADS, UNITS, RULES, POOL }
 ## 前面是地形（順序跟 TacticsMap.Kind 一樣）
 enum Tool { PLAIN, WALL, SWAMP, FOREST, HIGH, START, GOAL, SUPPLY, CHEST, ALLY, ENEMY, PATROL }
-## 放東西的工具（接在地形後面）
-const THING_NAMES: Array[String] = ["起點", "目標", "物資", "寶箱", "同伴", "敵人", "巡邏點"]
+## 放東西的工具（接在地形後面）和它的分類
+const THINGS: Array[Array] = [["起點", "我方"], ["目標", "我方"], ["物資", "物品"], ["寶箱", "物品"], ["同伴", "我方"], ["敵人", "敵人"], ["巡邏點", "敵人"]]
 ## 小隊的顏色（輪流用）
 const SQUAD_COLORS: Array[Color] = [Color("e0574a"), Color("e09a3a"), Color("b05ad0"), Color("3aa0b0"), Color("d05a90"), Color("8a8a3a")]
 
@@ -47,10 +47,12 @@ func _setup() -> void:
 	min_size = Vector2i(8, 6)
 	max_size = Vector2i(100, 100)
 	max_brush = 144.0
-	for i: int in TacticsMap.KIND_NAMES.size():
-		add_tool(TacticsMap.KIND_NAMES[i], true, i == TacticsMap.KIND_NAMES.size() - 1)
-	for text: String in THING_NAMES:
-		add_tool(text, false, text == "同伴")
+	for text: String in ["地形", "我方", "敵人", "物品"]:
+		add_category(text)
+	for text: String in TacticsMap.KIND_NAMES:
+		add_tool(text, true, false, "地形")
+	for item: Array in THINGS:
+		add_tool(item[0], false, false, item[1])
 	tool = Tool.WALL
 
 
@@ -258,10 +260,10 @@ func _draw_squad(canvas: Node2D, squad: TacticsSquad, number: int, selected: boo
 		if squad.view_of(k) <= 0.0:
 			continue
 		var at: Vector2 = cell_center(squad.cells[k])
-		var cone: PackedVector2Array = PackedVector2Array([at])
+		var cone: PackedVector2Array = PackedVector2Array()
 		for i: int in 17:
 			cone.append(at + Vector2.from_angle(squad.look_angle(k) - half + half * 2.0 * i / 16.0) * squad.view_of(k))
-		canvas.draw_colored_polygon(cone, Color(color, (0.22 if selected else 0.1) * (1.0 if k == 0 else 0.5)))
+		VisionSensor.draw_fan(canvas, at, cone, Color(color, (0.22 if selected else 0.1) * (1.0 if k == 0 else 0.5)))
 	var from: Vector2 = leader
 	for i: int in squad.patrol.size():
 		var to: Vector2 = cell_center(squad.patrol[i])
@@ -315,6 +317,17 @@ func _after_test() -> void:
 	TacticsPool.end_test()
 
 
+func _used_in_editor(path: String) -> String:
+	return "隊伍頁" if _pool_page.start.has(path) else super(path)
+
+
+func _scene_deleted(path: String) -> void:
+	super(path)
+	TacticsUnitInfo.forget_look(path)
+	_refresh_units()
+	_refresh_pages()
+
+
 func _level_request(map_path: String) -> Dictionary:
 	if not tac.problem().is_empty():
 		say(tac.problem())
@@ -326,13 +339,9 @@ func _level_request(map_path: String) -> Dictionary:
 # ---- 介面 ----
 
 func _build_rows() -> void:
-	var row: HBoxContainer = add_row(592)
-	add_tool_buttons(row)
-	add_shape_buttons(row, true)
-	row = add_row(626)                                            # 第二排：檔案、地圖大小
-	add_file_controls(row)
-	add_size_boxes(row)
-	row.add_child(VSeparator.new())
+	var tool_row: HBoxContainer = add_category_rows()
+	add_shape_buttons(add_category_box(tool_row, ["地形"]), true)
+	var row: HBoxContainer = add_category_box(tool_row, ["物品"])
 	add_label(row, "寶箱裡有")
 	_chest_box = SpinBox.new()
 	_chest_box.min_value = 0
@@ -344,17 +353,20 @@ func _build_rows() -> void:
 		chest_amount = int(value)
 		set_tool(Tool.CHEST))
 	row.add_child(_chest_box)
-	row = add_row(660)                                            # 第三排：敵人
-	add_label(row, "敵人、巡邏點：")
+	row = add_category_box(tool_row, ["敵人"])
+	add_label(row, "哪一隊")
 	_squad_list = _options(row, 180)
 	_squad_list.item_selected.connect(_on_squad_selected)
-	add_label(row, "放哪一種（敵人、同伴）：")
+	row = add_category_box(tool_row, ["我方", "敵人"])
+	add_label(row, "哪一種棋子")
 	_unit_list = _options(row, 160)
 	_unit_list.item_selected.connect(func(index: int) -> void:
 		unit_path = _unit_paths[index]
-		if tool != Tool.ALLY:
-			set_tool(Tool.ENEMY))
+		set_tool(Tool.ENEMY if category == "敵人" else Tool.ALLY))
 	_refresh_units()
+	row = add_row(660)                                            # 第三排：檔案、地圖大小
+	add_file_controls(row)
+	add_size_boxes(row)
 
 
 func _options(row: Control, width: float) -> OptionButton:

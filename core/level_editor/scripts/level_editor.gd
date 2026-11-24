@@ -51,15 +51,19 @@ var camera_margin: Vector4 = Vector4(64, 48, 64, 160)
 ## 工具列離左邊多遠
 var ui_left: float = 16.0
 var stop_position: Vector2 = Vector2(1020, 22)
-## 工具：{"name": 名字, "paint": 是不是畫地形的, "gap": 後面要不要隔線}，用 add_tool() 加
+## 工具：{"name": 名字, "paint": 是不是畫地形的, "gap": 後面要不要隔線, "category": 分類}，用 add_tool() 加
 var tools: Array[Dictionary] = []
 ## 分頁：{"name", "panel", "hint", "own_save"}，用 add_page() 加。第一頁是地圖
 var pages: Array[Dictionary] = []
+## 工具的分類（沒有＝不分類）。add_tool() 給了分類就會自動加，也可以用 add_category() 先排順序
+var categories: PackedStringArray = PackedStringArray()
 
 # ---- 狀態 ----
 
 var map: Resource
 var tool: int = 0
+## 現在在哪個分類
+var category: String = ""
 var shape: int = Shape.BRUSH
 ## 筆刷半徑（像素）
 var brush: float = 28.0
@@ -111,6 +115,12 @@ var _tool_buttons: Dictionary[int, Button] = {}
 ## 第幾種形狀 → 按鈕
 var _shape_buttons: Dictionary[int, Button] = {}
 var _page_buttons: Array[Button] = []
+## 分類 → 按鈕
+var _category_buttons: Dictionary[String, Button] = {}
+## 只在某些分類出現的東西：{"node", "categories"}
+var _category_parts: Array[Dictionary] = []
+## 分類 → 上次用第幾個工具
+var _category_tools: Dictionary[String, int] = {}
 var _snap_button: Button
 var _name_edit: LineEdit
 var _load_list: OptionButton
@@ -118,6 +128,9 @@ var _width: SpinBox
 var _height: SpinBox
 var _save_button: Button
 var _stop_button: Button
+## 試玩前問要不要存檔的視窗，和問完怎麼開始
+var _ask: ConfirmationDialog
+var _test_start: Callable
 var _status: Label
 var _status_text: String = ""
 ## 每隔一小段時間看一次有沒有東西還沒存
@@ -232,6 +245,18 @@ func _before_test() -> void:
 	pass
 
 
+## 編輯器裡還沒存檔的東西有沒有用到這個場景（有的話不給刪；回傳哪裡，沒有＝空字串）
+func _used_in_editor(path: String) -> String:
+	return "現在編的地圖" if str(map.call("snapshot")).contains(path) else ""
+
+
+## 場景頁刪掉了一個場景：有用到它的上一步也不要了（不然退回去會讀不到）。要更新清單就覆寫（記得 super）
+func _scene_deleted(path: String) -> void:
+	var gone: Callable = func(state: Dictionary) -> bool: return not str(state).contains(path)
+	_history.assign(_history.filter(gone))
+	_future.assign(_future.filter(gone))
+
+
 ## 停止試玩
 func _after_test() -> void:
 	pass
@@ -340,6 +365,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 	if page != 0:
+		return
+	if key != null:
+		var number: int = key.keycode - KEY_1                     # 1、2、3……換分類
+		if key.pressed and not key.echo and number >= 0 and number < mini(categories.size(), 9):
+			set_category(categories[number])
+			get_viewport().set_input_as_handled()
 		return
 	var button: InputEventMouseButton = event as InputEventMouseButton
 	if button != null:
@@ -463,6 +494,13 @@ func clear_terrain() -> void:
 
 func set_tool(to: int) -> void:
 	tool = to
+	var in_category: String = tools[to]["category"]
+	if not in_category.is_empty():
+		_category_tools[in_category] = to
+		category = in_category
+	elif category.is_empty() and not categories.is_empty():
+		category = categories[0]
+	_show_category()
 	for i: int in _tool_buttons:
 		_tool_buttons[i].button_pressed = i == to
 	for button: Button in _shape_buttons.values():
@@ -470,6 +508,26 @@ func set_tool(to: int) -> void:
 	if _snap_button != null:
 		_snap_button.disabled = not is_paint_tool()
 	say()
+
+
+## 換分類：用這個分類上次用的工具（沒用過＝第一個；一個都沒有＝不分類的那個，例如「選取」）
+func set_category(to: String) -> void:
+	category = to
+	var found: int = _category_tools.get(to, -1)
+	for i: int in tools.size():
+		if found < 0 and tools[i]["category"] == to:
+			found = i
+	for i: int in tools.size():
+		if found < 0 and (tools[i]["category"] as String).is_empty():
+			found = i
+	set_tool(found if found >= 0 else tool)
+
+
+func _show_category() -> void:
+	for text: String in _category_buttons:
+		_category_buttons[text].button_pressed = text == category
+	for part: Dictionary in _category_parts:
+		(part["node"] as Control).visible = (part["categories"] as Array).has(category)
 
 
 func set_shape(to: int) -> void:
@@ -651,6 +709,49 @@ func is_testing() -> bool:
 	return _play != null and is_instance_valid(_play)
 
 
+## 按「▶ 試玩」：有東西沒存就先問，都存好了就直接開始。start＝怎麼開始
+func request_test(start: Callable = start_test) -> void:
+	commit_pages()
+	if is_testing() or unsaved().is_empty() or not check_map().is_empty():
+		start.call()
+		return
+	_test_start = start
+	_ask.dialog_text = "還沒存檔：%s\n\n「不存」的話，地圖用現在改的，其他的用上次存的" % "、".join(unsaved())
+	_ask.popup_centered()
+
+
+## 哪些東西還沒存檔（名字）
+func unsaved() -> PackedStringArray:
+	var result: PackedStringArray = PackedStringArray()
+	if is_dirty():
+		result.append(pages[0]["name"])
+	for item: Dictionary in pages:
+		if _is_page_dirty(item):
+			var scene_page: LevelEditorScenePage = item["panel"] as LevelEditorScenePage
+			result.append(item["name"] if scene_page == null else "%s「%s」" % [item["name"], scene_page.data.get("display_name", "")])
+	return result
+
+
+func _is_page_dirty(item: Dictionary) -> bool:
+	return item["own_save"] and item["panel"] != null and (item["panel"] as Object).has_method("is_dirty") and (item["panel"] as Object).call("is_dirty")
+
+
+## 全部存檔。回傳都存好了沒
+func save_all() -> bool:
+	commit_pages()
+	for item: Dictionary in pages:
+		if _is_page_dirty(item):
+			(item["panel"] as Object).call("save")
+			if _is_page_dirty(item):
+				return false                                      # 存不了（原因那一頁會說）
+	return not is_dirty() or not save_map().is_empty()
+
+
+func _save_and_test() -> void:
+	if save_all():
+		_test_start.call()
+
+
 ## 開始試玩：在編輯器裡放一個關卡（不換場景）
 func start_test() -> bool:
 	if is_testing():
@@ -797,9 +898,17 @@ func make_level() -> String:
 
 # ---- 介面（做自己的編輯器時，這些都可以拿來用） ----
 
-## 加一個工具。paint＝畫地形的（左鍵畫、右鍵擦、可以選形狀）；gap＝後面隔一條線
-func add_tool(text: String, paint: bool = false, gap: bool = false) -> void:
-	tools.append({"name": text, "paint": paint, "gap": gap})
+## 加一個工具。paint＝畫地形的（左鍵畫、右鍵擦、可以選形狀）；gap＝後面隔一條線；
+## in_category＝放在哪個分類（用 add_category_rows() 的話；空的＝一直看得到）
+func add_tool(text: String, paint: bool = false, gap: bool = false, in_category: String = "") -> void:
+	tools.append({"name": text, "paint": paint, "gap": gap, "category": in_category})
+	add_category(in_category)
+
+
+## 加一個分類（還沒有工具的分類也可以先加）
+func add_category(text: String) -> void:
+	if not text.is_empty() and not categories.has(text):
+		categories.append(text)
 
 
 ## 加一頁。panel＝那一頁的面板（地圖頁不用給）；hint＝換到這一頁時的提示；own_save＝那一頁有自己的存檔鈕。
@@ -807,6 +916,10 @@ func add_tool(text: String, paint: bool = false, gap: bool = false) -> void:
 func add_page(text: String, panel: PanelContainer = null, area: Rect2 = Rect2(64, 48, 1196, 640), hint: String = "", own_save: bool = false) -> void:
 	pages.append({"name": text, "panel": panel, "hint": PAINT_HINT if panel == null and hint.is_empty() else hint, "own_save": own_save})
 	if panel != null:
+		var scene_page: LevelEditorScenePage = panel as LevelEditorScenePage
+		if scene_page != null:
+			scene_page.used_in_editor = _used_in_editor
+			scene_page.deleted.connect(_scene_deleted)
 		add_panel(panel, area)
 		panel.visible = false
 
@@ -839,13 +952,41 @@ func add_row(y: float) -> HBoxContainer:
 	return _row(Vector2(ui_left, y), _map_tools)
 
 
-## 工具的按鈕。很多的話可以分好幾排：from＝從第幾個開始、count＝幾個（-1＝到最後）
+## 工具的按鈕。很多的話可以分好幾排：from＝從第幾個開始、count＝幾個（-1＝到最後）。再多就分類，用 add_category_rows()
 func add_tool_buttons(row: Control, from: int = 0, count: int = -1) -> void:
 	for i: int in range(from, tools.size() if count < 0 else from + count):
 		_tool_buttons[i] = add_toggle(row, tools[i]["name"], set_tool.bind(i))
 		if tools[i]["gap"]:
 			row.add_child(VSeparator.new())
 	row.add_child(VSeparator.new())
+
+
+## 工具分類：第一排是不分類的工具和分類（按 1、2、3……切換），第二排只有這個分類的工具。
+## 回傳第二排，要加這個分類自己的東西：add_category_box(那一排, ["分類"])
+func add_category_rows(first_y: float = 592.0, second_y: float = 626.0) -> HBoxContainer:
+	var first: HBoxContainer = add_row(first_y)
+	var second: HBoxContainer = add_row(second_y)
+	for i: int in tools.size():
+		var in_category: String = tools[i]["category"]
+		_tool_buttons[i] = add_toggle(first if in_category.is_empty() else second, tools[i]["name"], set_tool.bind(i))
+		if not in_category.is_empty():
+			_category_parts.append({"node": _tool_buttons[i], "categories": [in_category]})
+	if first.get_child_count() > 0:
+		first.add_child(VSeparator.new())
+	for i: int in categories.size():
+		_category_buttons[categories[i]] = add_toggle(first, "%d %s" % [i + 1, categories[i]], set_category.bind(categories[i]))
+		_category_buttons[categories[i]].tooltip_text = "按 %d 切換" % (i + 1)
+	second.add_child(VSeparator.new())
+	return second
+
+
+## 一格只在這些分類出現的地方（放形狀按鈕、下拉選單……）
+func add_category_box(row: Control, in_categories: Array) -> HBoxContainer:
+	var box: HBoxContainer = HBoxContainer.new()
+	box.add_theme_constant_override("separation", 6)
+	row.add_child(box)
+	_category_parts.append({"node": box, "categories": in_categories})
+	return box
 
 
 ## 畫筆、矩形、圓形、油漆桶；with_snap＝可以切換「對齊格子」；shapes＝只要這幾種（空的＝全部）
@@ -963,8 +1104,18 @@ func _build_ui() -> void:
 	row.add_child(VSeparator.new())
 	if _save_button == null:
 		_add_save(row)
-	LevelEditorStyle.paint(add_button(row, "▶ 試玩", start_test), LevelEditorStyle.PLAY)
+	LevelEditorStyle.paint(add_button(row, "▶ 試玩", request_test), LevelEditorStyle.PLAY)
 	_build_top(row)
+	_ask = ConfirmationDialog.new()
+	_ask.title = "試玩之前"
+	_ask.ok_button_text = "存檔並試玩"
+	_ask.cancel_button_text = "取消"
+	_ask.add_button("不存，直接試玩", true, "skip")
+	_ask.confirmed.connect(_save_and_test)
+	_ask.custom_action.connect(func(_action: StringName) -> void:
+		_ask.hide()
+		_test_start.call())
+	_ui.add_child(_ask)
 	# 試玩時才出現的「停止試玩」（另一層，編輯的介面藏起來時它還在）
 	var top: CanvasLayer = CanvasLayer.new()
 	top.layer = 25                                                # 在 HUD（20）上面、暫停選單（30）下面

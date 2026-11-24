@@ -3,7 +3,7 @@ extends Node
 ## 放陷阱的人：放在追逐 AI 底下，追逐 AI 進入某個狀態時（預設「搜尋」＝追丟了），在腳下放一個捕獸夾。
 ## 最多放幾個可以調，超過的話最舊的會消失。
 ##
-## 用法：把 trap_dropper.tscn 拖到追逐 AI（ChaseAI）底下，當它的子節點。
+## 用法：在編輯器的「敵人」頁勾起來；或把 trap_dropper.tscn 拖到追逐 AI（ChaseAI）底下，當它的子節點。
 ## 想放別的東西：把「要放的東西」換成別的場景（例如警報壓力板）。
 
 ## 放下東西了
@@ -30,6 +30,19 @@ func _ready() -> void:
 		push_warning("TrapDropper 要放在追逐 AI（ChaseAI）底下。")
 		return
 	_ai.state_changed.connect(_on_state_changed)
+
+
+## 編輯器裡的名字、說明、欄位的名字
+func trait_name() -> String:
+	return "放捕獸夾"
+
+
+func description() -> String:
+	return "追丟（或其他狀態）時在腳下放一個捕獸夾"
+
+
+func labels() -> Dictionary:
+	return {"drop_on": "什麼時候放", "max_traps": "最多幾個", "dropped_one_shot": "夾子只用一次"}
 
 
 func _on_state_changed(state: ChaseAI.State) -> void:

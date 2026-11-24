@@ -1,10 +1,12 @@
 class_name LevelEditorScenePage
 extends PanelContainer
-## 編輯器的「一類場景」頁（怪物、棋子……）：左邊清單、中間改數值和勾掛件、右邊預覽，存成一般場景。
+## 編輯器的「一類場景」頁（怪物、棋子……）：左邊清單（新的、複製、刪掉）、中間改數值和勾掛件、右邊預覽，存成一般場景。
 ## 做自己的：extends LevelEditorScenePage，在 _setup() 填 scenes、thing、fields，要算數值就覆寫 _preview_text()。
 
 ## 存了一個（其他頁要更新清單）
 signal saved(path: String)
+## 刪了一個（其他頁要更新清單）
+signal deleted(path: String)
 
 const MAX_HISTORY: int = 50
 
@@ -14,13 +16,17 @@ const MAX_HISTORY: int = 50
 var scenes: LevelEditorScenes
 ## 這種東西叫什麼（「怪」「棋子」）
 var thing: String = "東西"
-## 可以改的欄位（LevelEditorForm 的欄位；名字固定用 display_name，會自動放在最上面）
+## 可以改的欄位（LevelEditorForm 的欄位；名字 display_name 會自動放在最上面，腳本沒有這個欄位就存在 metadata）
 var fields: Array[Dictionary] = []
 ## 掛件叫什麼（「掛件」「特性」）
 var trait_title: String = "掛件"
+## 欄位排成幾欄（欄位很多的話用 2）
+var form_columns: int = 1
 ## 預覽的背景色、放大幾倍
 var preview_color: Color = Color("6b5340")
 var preview_scale: float = 4.0
+## 預覽放在框裡的哪裡（框是 280×240）
+var preview_at: Vector2 = Vector2(140, 120)
 
 # ---- 狀態 ----
 
@@ -37,6 +43,8 @@ var dirty: bool:
 	get: return _session.get("dirty", false)
 	set(value): _session["dirty"] = value
 var say: Callable = func(_text: String) -> void: pass
+## 編輯器裡還沒存檔的地方有沒有用到這個場景（回傳哪裡，沒有＝空字串；編輯器給的）
+var used_in_editor: Callable = func(_path: String) -> String: return ""
 
 var _session: Dictionary = LevelEditor.session_of((get_script() as Script).resource_path)
 var _history: Array[Dictionary] = []
@@ -48,6 +56,11 @@ var _preview_box: Control
 var _preview: Node2D
 var _stats: Label
 var _save_button: Button
+var _new_button: Button
+var _copy_button: Button
+var _delete_button: Button
+## 按過一次「刪掉」了（再按一次才真的刪）
+var _delete_armed: bool = false
 var _title: Label
 
 
@@ -70,6 +83,11 @@ func is_locked() -> bool:
 ## 預覽旁邊的字（preview 已經在場景裡，掛件有作用）
 func _preview_text(_preview_node: Node2D) -> String:
 	return ""
+
+
+## 預覽放進場景之前
+func _preview_made(_preview_node: Node2D) -> void:
+	pass
 
 
 ## 預覽放進場景之後（例如從群組拿掉，不要被當成場上的）
@@ -125,7 +143,7 @@ func copy_scene() -> void:
 func _use_new(text: String) -> void:
 	var free_name: String = text
 	var n: int = 2
-	while ResourceLoader.exists(scenes.path_for(free_name)):      # 還沒有同名檔案的名字
+	while LevelEditorScenes.exists(scenes.path_for(free_name)):      # 還沒有同名檔案的名字
 		free_name = "%s%d" % [text, n]
 		n += 1
 	data["display_name"] = free_name
@@ -183,7 +201,7 @@ func save() -> String:
 	var to: String = path
 	if to.is_empty():
 		to = scenes.path_for(text)
-		if ResourceLoader.exists(to):
+		if LevelEditorScenes.exists(to):
 			say.call("已經有叫「%s」的%s了，換個名字" % [text, thing])
 			return ""
 	var error: Error = scenes.write(to, data)
@@ -197,6 +215,73 @@ func save() -> String:
 	refresh()
 	say.call("存好了：%s" % to)
 	return to
+
+
+# ---- 刪 ----
+
+## 為什麼不能刪（可以刪＝空字串）
+func delete_problem() -> String:
+	if path == scenes.base_path or is_locked():
+		return "這個不能刪"
+	if path.is_empty():
+		return ""                                                 # 還沒存過的，直接丟掉
+	if _list_paths().size() <= 1:
+		return "至少要留一個"
+	var where: String = used_in_editor.call(path)
+	if not where.is_empty():
+		return "%s有用到「%s」，先換成別種" % [where, data["display_name"]]
+	var files: PackedStringArray = LevelEditorScenes.used_by(path)
+	if files.is_empty():
+		return ""
+	var names: PackedStringArray = PackedStringArray()
+	for file: String in files.slice(0, 3):
+		names.append(file.get_file())
+	return "%s%s 有用到「%s」，先換成別種" % ["、".join(names), " 等 %d 個檔案" % files.size() if files.size() > 3 else "", data["display_name"]]
+
+
+## 「刪掉」：按第一次先問，再按一次才刪
+func press_delete() -> void:
+	commit()
+	var trouble: String = delete_problem()
+	if not trouble.is_empty():
+		say.call("不能刪：" + trouble)
+		return
+	if not _delete_armed:
+		_delete_armed = true
+		_delete_button.text = "再按一次就刪掉"
+		say.call("再按一次就刪掉「%s」" % data["display_name"])
+		return
+	delete_scene()
+
+
+## 刪掉現在這個（丟到資源回收桶；按上一步拿得回來，變成還沒存檔的）。回傳有沒有刪
+func delete_scene() -> bool:
+	var trouble: String = delete_problem()
+	if not trouble.is_empty():
+		say.call("不能刪：" + trouble)
+		return false
+	var old: String = path
+	var text: String = data["display_name"]
+	if not old.is_empty():
+		var error: Error = scenes.delete(old)
+		if error != OK:
+			say.call("刪不掉：%s" % error_string(error))
+			return false
+		for state: Dictionary in _history + _future:
+			if state["path"] == old:
+				state["path"] = ""                                # 檔案沒了：上一步回來就是還沒存過的
+	path = ""
+	open(_first_path())
+	if not old.is_empty():
+		deleted.emit(old)
+	say.call("刪掉了「%s」%s" % [text, "" if old.is_empty() else "（在資源回收桶；按上一步再存檔也可以救回來）"])
+	return true
+
+
+func _disarm_delete() -> void:
+	_delete_armed = false
+	_delete_button.text = "刪掉"
+	_delete_button.disabled = path == scenes.base_path or is_locked()
 
 
 # ---- 上一步、下一步 ----
@@ -262,8 +347,11 @@ func _build_ui() -> void:
 	_list.focus_mode = Control.FOCUS_NONE
 	_list.item_selected.connect(_on_selected)
 	left.add_child(_list)
-	_button(left, "＋ 新" + thing, new_scene)
-	_button(left, "複製成新" + thing, copy_scene)
+	_new_button = _button(left, "＋ 新" + thing, new_scene)
+	_copy_button = _button(left, "複製成新" + thing, copy_scene)
+	_delete_button = _button(left, "刪掉", press_delete)
+	LevelEditorStyle.paint(_delete_button, LevelEditorStyle.DANGER)
+	visibility_changed.connect(_disarm_delete)
 
 	var middle: VBoxContainer = VBoxContainer.new()
 	middle.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -309,7 +397,7 @@ func refresh() -> void:
 	_paths = _list_paths()
 	_list.clear()
 	for i: int in _paths.size():
-		_list.add_item(LevelEditorScenes.name_of(_paths[i]) + ("（不能改）" if _paths[i] == scenes.base_path else ""))
+		_list.add_item(scenes.label_of(_paths[i]) + ("（不能改）" if _paths[i] == scenes.base_path else ""))
 		if _paths[i] == path:
 			_list.select(i)
 	_rebuild_form()
@@ -325,7 +413,13 @@ func _update_title() -> void:
 	else:
 		_title.text = "　%s%s" % [path.get_file(), "　＊改了還沒存檔" if dirty else ""]
 	_save_button.disabled = is_locked()
+	_disarm_delete()
 	update_save_button()
+
+
+## 改了還沒存（試玩前會問要不要存）
+func is_dirty() -> bool:
+	return dirty and not is_locked()
 
 
 func update_save_button() -> void:
@@ -339,7 +433,7 @@ func _rebuild_form() -> void:
 		_form.remove_child(child)
 		child.queue_free()
 	var grid: GridContainer = GridContainer.new()
-	grid.columns = 2
+	grid.columns = form_columns * 2
 	_form.add_child(grid)
 	_lock(LevelEditorForm.add(grid, LevelEditorForm.text("display_name", "名字"), data["display_name"], set_value))
 	for field: Dictionary in fields:
@@ -395,9 +489,10 @@ func _update_preview() -> void:
 		_preview.free()
 	_preview = scenes.make_preview(path, data)
 	_preview.process_mode = Node.PROCESS_MODE_DISABLED
+	_preview_made(_preview)
 	_preview_box.add_child(_preview)
 	_preview_added(_preview)
-	_preview.position = Vector2(140, 120)
+	_preview.position = preview_at
 	_preview.scale = Vector2.ONE * preview_scale
 	_stats.text = _preview_text(_preview)
 

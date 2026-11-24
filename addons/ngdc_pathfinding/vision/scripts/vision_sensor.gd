@@ -21,8 +21,8 @@ signal target_lost(target: Node2D)
 const SIGHT_LAYER: int = 1 << 1
 
 @export_group("視野")
-## 看多遠（像素）
-@export_range(20, 1000, 10, "suffix:px") var view_distance: float = 260.0
+## 看多遠（像素）。0＝完全看不到
+@export_range(0, 1000, 10, "suffix:px") var view_distance: float = 260.0
 ## 視野角度（度）。90＝左右各 45 度；360＝背後也看得到
 @export_range(10, 360, 5, "suffix:°") var view_angle: float = 90.0
 ## 牆會擋視線。關掉 → 隔著牆也看得到
@@ -86,8 +86,8 @@ func _physics_process(_delta: float) -> void:
 
 ## 視野三關：距離 → 角度 → 射線
 func can_see(who: Node2D) -> bool:
-	if who.get("is_hidden") == true:
-		return false                                              # 躲起來了
+	if view_distance <= 0.0 or who.get("is_hidden") == true:
+		return false                                              # 看不到東西，或目標躲起來了
 	var to_target: Vector2 = who.global_position - global_position
 	if to_target.length() > view_distance:
 		return false                                              # ① 太遠
@@ -123,10 +123,22 @@ func get_cone_polygon() -> PackedVector2Array:
 
 
 func _draw_cone() -> void:
-	if not show_cone or not PathDebug.show_cones or not is_visible_in_tree():
+	if not show_cone or not PathDebug.show_cones or not is_visible_in_tree() or view_distance <= 0.0:
 		return
-	var cone: PackedVector2Array = get_cone_polygon()
-	for i: int in cone.size():
-		cone[i] += global_position
-	if cone.size() >= 3:
-		_drawer.draw_colored_polygon(cone, cone_color)
+	var edge: PackedVector2Array = get_cone_polygon()
+	for i: int in edge.size():
+		edge[i] += global_position
+	draw_fan(_drawer, global_position, edge, cone_color)
+
+
+## 畫扇形：從 center 到邊緣 edge，一片一片的三角形。
+## 不用 draw_colored_polygon()：一整圈、貼著牆的時候頂點會重疊，切不出三角形就會出錯
+static func draw_fan(canvas: CanvasItem, center: Vector2, edge: PackedVector2Array, color: Color) -> void:
+	if edge.size() < 2:
+		return
+	var points: PackedVector2Array = PackedVector2Array([center])
+	points.append_array(edge)
+	var triangles: PackedInt32Array = PackedInt32Array()
+	for i: int in range(1, edge.size()):
+		triangles.append_array([0, i, i + 1])
+	RenderingServer.canvas_item_add_triangle_array(canvas.get_canvas_item(), triangles, points, PackedColorArray([color]))

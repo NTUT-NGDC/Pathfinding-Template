@@ -9,6 +9,7 @@ extends "res://examples/_tests/scripts/example_test.gd"
 ##   godot --headless --fixed-fps 60 --path . res://examples/_tests/chase_test.tscn
 
 const CHASE: String = "res://examples/chase/levels/chase.tscn"
+const DROPPER: String = "res://examples/chase/features/enemy_traits/trap_dropper.tscn"
 
 
 func _run() -> void:
@@ -317,17 +318,18 @@ func _test_chase_editor() -> void:
 	editor.call("set_tool", first)
 	_expect(not bool(editor.call("place", Vector2i(6, 6))), "只能有一個玩家")
 	editor.call("set_tool", first + 6)
-	_expect(bool(editor.call("place", Vector2i(20, 5))) and not map.walls.has(Vector2i(20, 5)) and map.objects[2]["values"]["orientation"] == 1, "門放在牆上：開一個缺口，方向照牆")
+	_expect(bool(editor.call("place", Vector2i(20, 5))) and not map.walls.has(Vector2i(20, 5)) and ChaseMap.value(map.objects[2], "orientation") == 1, "門放在牆上：開一個缺口，方向照牆")
 	editor.call("set_tool", first + 3)
 	_expect(not bool(editor.call("place", Vector2i(20, 6))), "牆上不能放寶物")
 	editor.call("place", Vector2i(25, 5))
 	editor.call("place", Vector2i(26, 5))
 	_expect(map.objects[3]["name"] == "Treasure" and map.objects[4]["name"] == "Treasure2", "放兩個寶物，名字不一樣")
 	editor.call("set_tool", first + 2)
+	editor.call("set_kind", ChaseMap.ENEMY)
 	editor.call("place", Vector2i(30, 8))
 	panel.set_value("reaction_time", 2.5)
-	panel.set_dropper(true)
-	_expect(map.objects[5]["values"]["reaction_time"] == 2.5 and not (map.objects[5]["dropper"] as Dictionary).is_empty(), "敵人：改反應時間、追丟時放夾子")
+	panel.set_trait(DROPPER, true)
+	_expect(map.objects[5]["values"] == {"reaction_time": 2.5} and (map.objects[5]["traits"] as Dictionary).has(DROPPER), "敵人：改反應時間、追丟時放夾子；只記改過的")
 	editor.call("set_tool", editor.get("patrol_tool"))
 	editor.call("place", Vector2i(30, 12))
 	editor.call("place", Vector2i(25, 12))
@@ -350,8 +352,10 @@ func _test_chase_editor() -> void:
 	for field: Dictionary in ChaseMap.fields_of(ChaseMap.ENEMY):
 		labels.append(field["label"])
 	_expect(labels.has("看多遠") and labels.has("反應時間"), "欄位的中文名字從 ## 註解讀")
-	editor.call("set_page", 1)
-	(editor.get("_setting_page") as ChaseSettingPage).set_value("radius", 300.0)
+	editor.call("set_page", 3)
+	(editor.get("_rule_page") as ChaseRulePage).set_setting("radius", 300.0)
+	(editor.get("_rule_page") as ChaseRulePage).set_value(map.objects[0], "walk_speed", 150.0)
+	_expect(ChaseMap.value(map.objects[0], "walk_speed") == 150.0 and bool(editor.call("undo")) and ChaseMap.value(map.objects[0], "walk_speed") == 110.0, "規則頁：改玩家，也能上一步")
 	editor.call("set_page", 0)
 
 	(editor.get("_name_edit") as LineEdit).text = "_test_chase"
@@ -378,7 +382,127 @@ func _test_chase_editor() -> void:
 	await _frames(2)
 	_expect(not bool(editor.call("is_testing")) and (editor.get("map") as ChaseMap).snapshot() == saved, "停止試玩：回到編輯，關卡沒變")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(copy_path))
+	await _test_categories(editor)
+	await _test_kinds(editor)
 	LevelEditor.forget_sessions()
+
+
+## 工具分類：只看得到這一類的，數字鍵切換
+func _test_categories(editor: Node2D) -> void:
+	var buttons: Dictionary[int, Button] = editor.get("_tool_buttons")
+	var first: int = int(editor.get("select_tool")) + 1
+	editor.call("set_category", "地形")
+	_expect(buttons[3].visible and not buttons[first].visible and buttons[first - 1].visible, "分類：地形只看得到地形，「選取」一直都在")
+	editor.call("set_category", "目標")
+	_expect(not buttons[3].visible and buttons[first + 3].visible and buttons[first + 5].visible and int(editor.get("tool")) == first + 3, "分類：目標（出口、寶物、鑰匙、任務點），用上次的工具（寶物）")
+	editor.call("set_tool", first + 5)
+	editor.call("set_category", "機關")
+	var key: InputEventKey = InputEventKey.new()
+	key.keycode = KEY_3
+	key.pressed = true
+	editor.call("_unhandled_input", key)
+	_expect(editor.get("category") == "目標" and int(editor.get("tool")) == first + 5, "按 3 換到目標，記得上次用任務點")
+	_expect((editor.get("_kind_box") as Control).visible, "任務點可以選哪一種")
+	editor.call("set_tool", first + 1)
+	_expect(not (editor.get("_kind_box") as Control).visible, "出口沒有種類")
+	await _frames(1)
+
+
+## 種類：放、改一種全部跟著改、自己改過的留著、換一種、特性
+func _test_kinds(editor: Node2D) -> void:
+	for text: String in ["killer", "guard", "hound"]:
+		_expect(ChaseKinds.base_of(ChaseKinds.FEATURES + "enemies/%s.tscn" % text) == ChaseMap.ENEMY, "%s 是敵人的一種" % text)
+	var enemy_page: ChaseEnemyPage = editor.get("_enemy_page")
+	var object_page: ChaseKindPage = editor.get("_object_page")
+	var panel: ChaseObjectPanel = editor.get("_panel")
+	var first: int = int(editor.get("select_tool")) + 1
+	editor.call("new_map")
+	var map: ChaseMap = editor.get("map")
+	editor.call("set_page", 1)
+	enemy_page.open(ChaseMap.ENEMY)
+	enemy_page.set_value("view_distance", 100.0)
+	_expect(enemy_page.is_locked() and not enemy_page.dirty, "基本敵人不能改")
+	enemy_page.copy_scene()
+	enemy_page.set_value("display_name", "_test_敵人")
+	enemy_page.set_value("chase_speed", 222.0)
+	var path: String = enemy_page.save()
+	_expect(path.ends_with("features/enemies/_test_敵人.tscn") and ChaseKinds.name_of(path) == "_test_敵人" and not enemy_page.dirty, "做一種新敵人（%s）" % path)
+	editor.call("set_page", 0)
+	editor.call("set_tool", first + 2)
+	editor.call("set_kind", path)
+	editor.call("place", Vector2i(10, 4))
+	editor.call("place", Vector2i(12, 4))
+	panel.set_value("chase_speed", 99.0)
+	_expect(map.objects[2]["scene"] == path and map.count_of(ChaseMap.ENEMY) == 2 and (map.objects[2]["values"] as Dictionary).is_empty(), "放兩隻新敵人")
+	editor.call("edit_kind")
+	_expect(int(editor.get("page")) == 1 and enemy_page.path == path, "「改這種」：跳到敵人頁")
+	enemy_page.set_value("chase_speed", 180.0)
+	enemy_page.set_trait(DROPPER, true)
+	_expect((editor.call("unsaved") as PackedStringArray).has("敵人「_test_敵人」"), "沒存檔的敵人：試玩前會問")
+	enemy_page.save()
+	_expect(_cones(editor).is_empty(), "編輯器裡沒有遊戲的視野錐")
+	enemy_page.set_value("view_distance", 0.0)
+	_expect((enemy_page.get("_stats") as Label).text.contains("看不到"), "視野可以調成 0（看不到）")
+	enemy_page.undo()
+	_expect(ChaseMap.value(map.objects[2], "chase_speed") == 180.0 and ChaseMap.value(map.objects[3], "chase_speed") == 99.0, "改種類：地圖上的跟著改，自己改過的留著")
+	_expect(ChaseMap.kind_traits(path).has(DROPPER), "種類有特性")
+	var level_path: String = "res://examples/chase/levels/_test_kinds.tscn"
+	map.map_name = "_test_kinds"
+	_expect(map.write(level_path) == OK and ChaseMap.read(level_path).snapshot() == map.snapshot(), "存檔、讀回來一模一樣")
+	var level: Node = (load(level_path) as PackedScene).instantiate()
+	var enemy: ChaseAI = level.get_node(String(map.objects[2]["name"]))
+	var droppers: int = enemy.get_children().filter(func(n: Node) -> bool: return n is TrapDropper).size()
+	_expect(enemy.chase_speed == 180.0 and droppers == 1, "關卡裡：種類的數值、特性只有一個")
+	level.free()
+	editor.call("set_page", 0)
+	editor.call("select", 3)
+	panel.reset_to_kind()
+	_expect(ChaseMap.value(map.objects[3], "chase_speed") == 180.0, "「跟種類一樣」")
+	panel.set_kind(ChaseKinds.FEATURES + "enemies/hound.tscn")
+	_expect(ChaseMap.value(map.objects[3], "hearing_multiplier") == 2.0 and map.write(level_path) == OK and ChaseMap.read(level_path).objects[3]["scene"].ends_with("hound.tscn"), "換成獵犬，存檔也是")
+	editor.call("undo")
+	_expect(map.objects[3]["scene"] == path, "換種類也能上一步")
+	await _frames(3)
+
+	editor.call("set_page", 2)
+	object_page.set_class(0)
+	_expect(object_page.thing == "任務點" and object_page.call("_list_paths").size() == 4, "物件頁：任務點（電腦、發電機、保險箱＋基本）")
+	object_page.open(ChaseKinds.FEATURES + "task_point/kinds/safe.tscn")
+	object_page.set_value("hold_time", 3.0)
+	object_page.set_class(1)
+	_expect(object_page.thing == "捕獸夾" and object_page.is_locked(), "換一類：捕獸夾")
+	object_page.copy_scene()
+	object_page.set_value("hold_time", 4.0)
+	var trap_path: String = object_page.save()
+	_expect(trap_path.contains("trap/kinds/") and ChaseMap.defaults_of(trap_path)["hold_time"] == 4.0, "做第一種捕獸夾：資料夾自己建（%s）" % trap_path)
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(trap_path))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(trap_path.get_base_dir()))
+	for i: int in 3:
+		object_page.undo()
+	_expect(object_page.which == 0 and object_page.data["hold_time"] == 3.0 and object_page.dirty, "換一類也能上一步，改到一半的還在")
+	object_page.undo()
+	_expect(not object_page.dirty, "退回原本的樣子就不算沒存")
+	_expect(get_tree().get_nodes_in_group("chase_ai").is_empty() and get_tree().get_nodes_in_group("objectives").is_empty() and get_tree().get_nodes_in_group("path_obstacles").is_empty(), "預覽、編輯器裡的不算場上的")
+	enemy_page.open(path)
+	_expect(enemy_page.delete_problem().contains("現在編的地圖"), "地圖上有放的種類不能刪（%s）" % enemy_page.delete_problem())
+	editor.call("set_page", 0)
+	for i: int in 2:
+		editor.call("delete_object", 2)
+	_expect(enemy_page.delete_problem().contains("_test_kinds.tscn"), "別的關卡有用到也不能刪（%s）" % enemy_page.delete_problem())
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(level_path))
+	_expect(enemy_page.delete_scene() and not FileAccess.file_exists(path) and not ChaseKinds.paths(ChaseKinds.with_base(ChaseMap.ENEMY)).has(path), "都沒用到：刪掉了")
+	while (editor.get("_history") as Array).size() > 0:
+		editor.call("undo")
+	_expect(map.count_of(ChaseMap.ENEMY) == 0, "退到底也不會跑出刪掉的種類")
+	editor.call("set_tool", first + 2)
+	_expect(editor.call("kind_to_place", ChaseMap.ENEMY) != path, "放敵人：換成還在的種類")
+	for file: String in [path, level_path]:
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(file))
+
+
+## 畫得出來的視野錐（畫在最上層，換頁、試玩時也看得到，編輯器裡不能有）
+func _cones(root: Node) -> Array[Node]:
+	return root.find_children("*", "VisionSensor", true, false).filter(func(v: Node) -> bool: return v.get("show_cone"))
 
 
 func _press_cell(editor: Node2D, tool: int, cell: Vector2i, erase: bool = false) -> void:

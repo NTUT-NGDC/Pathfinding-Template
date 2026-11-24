@@ -1,0 +1,7 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://examples/chase/features/task_point/task_point.tscn" id="1_base"]
+
+[node name="Generator" instance=ExtResource("1_base")]
+hold_time = 6.0
+metadata/display_name = "發電機"

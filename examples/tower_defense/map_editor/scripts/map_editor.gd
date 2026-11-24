@@ -177,6 +177,16 @@ func _before_test() -> void:
 		say("提醒：怪物「%s」改了還沒存檔，試玩用的是存過的" % _enemy_page.data.get("display_name", ""))
 
 
+func _used_in_editor(path: String) -> String:
+	return "現在編的波次" if _wave_page.uses(path) else ""
+
+
+func _scene_deleted(path: String) -> void:
+	_wave_page.forget_history()
+	_wave_page.refresh()
+	super(path)
+
+
 func _level_request(map_path: String) -> Dictionary:
 	var waves_path: String = _wave_page.saved_path()
 	if _wave_page.is_dirty() or waves_path.is_empty():
@@ -205,7 +215,7 @@ func _build_pages() -> void:
 	add_page("地圖")
 	_wave_page = TDWavePage.new()
 	_wave_page.name = "WavePage"
-	_wave_page.test_requested.connect(func(wave_number: int) -> void: start_test(wave_number))
+	_wave_page.test_requested.connect(func(wave_number: int) -> void: request_test(start_test.bind(wave_number)))
 	add_page("波次", _wave_page, Rect2(220, 48, 1040, 640), "排好按「存檔」，再把 waves/ 裡的檔案拖進關卡 Spawner 的 Wave Table", true)
 	_enemy_page = TDEnemyPage.new()
 	_enemy_page.name = "EnemyPage"

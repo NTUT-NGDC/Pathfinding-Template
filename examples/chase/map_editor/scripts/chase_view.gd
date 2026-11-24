@@ -54,6 +54,12 @@ func refresh() -> void:
 	queue_redraw()
 
 
+## 種類改了：物件重畫
+func redraw_objects() -> void:
+	_drawn_objects = []
+	refresh()
+
+
 func _fill(layer: TileMapLayer, tiles: Dictionary[Vector2i, int]) -> void:
 	layer.clear()
 	for cell: Vector2i in tiles:
@@ -71,7 +77,7 @@ func show_objects(on: bool) -> void:
 	for object: Dictionary in map.objects:
 		var node: Node2D = (load(object["scene"]) as PackedScene).instantiate()
 		for key: String in object["values"]:
-			if key != "targets":
+			if key != "targets":                                  # 其他的照種類
 				node.set(key, object["values"][key])
 		node.position = object["position"]
 		if node is ChaseAI:

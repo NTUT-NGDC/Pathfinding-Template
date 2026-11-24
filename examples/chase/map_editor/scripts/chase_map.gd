@@ -15,18 +15,21 @@ const ENEMY: String = "res://addons/ngdc_pathfinding/chase_ai/chase_ai.tscn"
 const EXIT: String = "res://examples/chase/features/exit/exit.tscn"
 const PLAYER: String = "res://examples/chase/features/player/player.tscn"
 const DARKNESS: String = "res://examples/chase/features/darkness/darkness.tscn"
-## 可以掛在敵人底下的
-const DROPPER: String = "res://examples/chase/features/trap/trap_dropper.tscn"
+## 每個物件自己的（不是種類的）：方向、巡邏、出口的目標
+const PER_OBJECT: Array[String] = ["orientation", "start_angle", "patrol_mode", "patrol_wait", "targets"]
 ## 註解第一句不適合當名字的，在這裡改（其他的自動用 @export 上面的 ## 註解）
 const LABELS: Dictionary[String, String] = {
 	"needed": "需要幾個", "patrol_speed": "巡邏速度", "chase_speed": "追擊速度", "search_time": "追丟後找幾秒",
 	"remember_last_position": "記住最後看到的", "catch_distance": "多近算抓到", "caught_message": "抓到時的文字", "patrol_mode": "走完巡邏點之後",
 	"run_sound_interval": "腳步聲隔幾秒", "bottle_sound_radius": "瓶子聲音多遠", "run_sound_radius": "跑步聲音多遠", "start_bottles": "一開始幾個瓶子",
 	"kind": "種類", "required": "算進出口條件", "action": "提示的動詞", "sound_interval": "聲音隔幾秒", "start_open": "一開始開著",
-	"sound_radius": "聲音傳多遠", "locked": "上鎖", "key_color": "鑰匙顏色", "cooldown": "冷卻", "drop_on": "什麼時候放", "max_traps": "最多幾個",
-	"one_shot": "只用一次", "dropped_one_shot": "夾子只用一次", "ai_avoids": "AI 會繞開", "visible_to_player": "看得見", "amount": "一次幾個",
+	"sound_radius": "聲音傳多遠", "locked": "上鎖", "key_color": "鑰匙顏色", "cooldown": "冷卻",
+	"one_shot": "只用一次", "ai_avoids": "AI 會繞開", "visible_to_player": "看得見", "amount": "一次幾個", "task_name": "遊戲裡叫什麼",
 }
 const DARKNESS_FIELDS: Array[String] = ["radius", "softness", "darkness"]
+
+static var _defaults: Dictionary[String, Dictionary] = {}
+static var _traits: Dictionary[String, PackedStringArray] = {}
 
 var map_name: String = "新關卡"
 ## 地圖大小（格數）
@@ -34,7 +37,8 @@ var size: Vector2i = Vector2i(36, 18)
 ## 格子 → 圖塊
 var floors: Dictionary[Vector2i, int] = {}
 var walls: Dictionary[Vector2i, int] = {}
-## 物件：{"name", "scene", "position", "values": {欄位: 值}, "points": 巡邏點（關卡裡的位置）, "dropper": 放捕獸夾的設定（沒有＝空的）}
+## 物件：{"name", "scene"（哪一種）, "position", "values": {欄位: 值，只記跟種類不一樣的}, "points": 巡邏點（關卡裡的位置）,
+## "traits": {特性: {欄位: 值}}，只記這一個自己多的}。看某個欄位現在多少用 value()，改用 set_value()
 var objects: Array[Dictionary] = []
 ## 黑暗、鏡頭：{"dark": 有沒有黑暗, "radius", "softness", "darkness", "follow": 鏡頭跟著玩家, "zoom"}
 var settings: Dictionary = {"dark": true, "radius": 240.0, "softness": 100.0, "darkness": 0.9, "follow": false, "zoom": 1.0}
@@ -90,8 +94,14 @@ func object_at(cell: Vector2i) -> int:
 	return -1
 
 
-func count_of(scene: String) -> int:
-	return objects.filter(func(o: Dictionary) -> bool: return o["scene"] == scene).size()
+## 有幾個（各種種類都算）
+func count_of(base: String) -> int:
+	return objects.filter(func(o: Dictionary) -> bool: return is_a(o, base)).size()
+
+
+## 這個物件是 base 或 base 的種類嗎
+static func is_a(object: Dictionary, base: String) -> bool:
+	return not object.is_empty() and ChaseKinds.base_of(object["scene"]) == base
 
 
 ## 腳本有錯（不能用）的物件場景（沒有＝空字串）
@@ -112,7 +122,7 @@ func problem() -> String:
 		return "要放一個玩家"
 	if count_of(EXIT) == 0:
 		return "至少要放一個出口"
-	if objects.any(func(o: Dictionary) -> bool: return o["scene"] == EXIT and o["values"]["open_when"] == 1 and (o["values"]["targets"] as Array).is_empty()):
+	if objects.any(func(o: Dictionary) -> bool: return is_a(o, EXIT) and value(o, "open_when") == 1 and (value(o, "targets") as Array).is_empty()):
 		return "出口選「指定」，要勾至少一個目標"
 	if walls.is_empty():
 		return "要畫牆（外面要圍起來）"
@@ -171,11 +181,55 @@ func fill(from: Vector2i, tile: int, erase: bool) -> int:
 
 ## 加一個物件（預設值＋values）。回傳第幾個
 func add_object(scene: String, at: Vector2, base_name: String, values: Dictionary = {}) -> int:
-	var object: Dictionary = {"name": _free_name(base_name), "scene": scene, "position": at, "values": defaults_of(scene), "points": [], "dropper": {}}
+	var object: Dictionary = {"name": _free_name(base_name), "scene": scene, "position": at, "values": {}, "points": [], "traits": {}}
 	for key: String in values:
-		object["values"][key] = values[key]
+		set_value(object, key, values[key])
 	objects.append(object)
 	return objects.size() - 1
+
+
+## 一個物件的欄位現在是多少（沒有自己改過＝種類的）
+static func value(object: Dictionary, field: String) -> Variant:
+	return object["values"][field] if (object["values"] as Dictionary).has(field) else defaults_of(object["scene"]).get(field)
+
+
+## 改一個物件的欄位（改成跟種類一樣就不用記）
+static func set_value(object: Dictionary, field: String, to: Variant) -> void:
+	if defaults_of(object["scene"]).get(field) == to:
+		(object["values"] as Dictionary).erase(field)
+	else:
+		object["values"][field] = to
+
+
+## 一個物件全部的欄位
+static func all_values(object: Dictionary) -> Dictionary:
+	return (object["values"] as Dictionary).merged(defaults_of(object["scene"]))
+
+
+## 自己改過、跟種類不一樣的欄位（方向、巡邏這種本來就是每個自己的不算）
+static func changed_fields(object: Dictionary) -> Array:
+	return (object["values"] as Dictionary).keys().filter(func(key: String) -> bool: return not PER_OBJECT.has(key))
+
+
+## 出口「指定」：要不要算這個目標
+static func set_target(object: Dictionary, target: String, on: bool) -> void:
+	var targets: Array = (value(object, "targets") as Array).duplicate()
+	targets.erase(target)
+	if on:
+		targets.append(target)
+	set_value(object, "targets", targets)
+
+
+## 換成另一種（自己改過的留著，跟新的種類一樣的就不用記）
+static func set_kind(object: Dictionary, scene: String) -> void:
+	var own: Dictionary = object["values"]
+	object["scene"] = scene
+	object["values"] = {}
+	for key: String in own:
+		if defaults_of(scene).has(key):
+			set_value(object, key, own[key])
+	for path: String in kind_traits(scene):
+		(object["traits"] as Dictionary).erase(path)
 
 
 func _free_name(text: String) -> String:
@@ -205,11 +259,32 @@ static func fields_of(scene: String) -> Array[Dictionary]:
 	return result
 
 
+## 一種場景的預設值（讀過的記起來；不要直接改它）
 static func defaults_of(scene: String) -> Dictionary:
-	var node: Node = (load(scene) as PackedScene).instantiate()
-	var result: Dictionary = values_of(node)
-	node.free()
-	return result
+	if not _defaults.has(scene):
+		var node: Node = (load(scene) as PackedScene).instantiate()
+		_defaults[scene] = values_of(node)
+		node.free()
+	return _defaults[scene]
+
+
+## 這一種本來就有的特性
+static func kind_traits(scene: String) -> PackedStringArray:
+	if not _traits.has(scene):
+		var node: Node = (load(scene) as PackedScene).instantiate()
+		var found: PackedStringArray = PackedStringArray()
+		for child: Node in node.get_children():
+			if ChaseKinds.traits_of(scene).has(child.scene_file_path):
+				found.append(child.scene_file_path)
+		_traits[scene] = found
+		node.free()
+	return _traits[scene]
+
+
+## 種類改了：下次重讀
+static func forget() -> void:
+	_defaults.clear()
+	_traits.clear()
 
 
 static func values_of(node: Node) -> Dictionary:
@@ -264,12 +339,15 @@ func _read(root: Node) -> void:
 			for target: Node in (child as Exit).targets:
 				if target != null:
 					values["targets"].append(String(target.name))
-		var object: Dictionary = {"name": String(child.name), "scene": child.scene_file_path, "position": (child as Node2D).position, "values": values, "points": [], "dropper": {}}
+		var scene: String = child.scene_file_path
+		var object: Dictionary = {"name": String(child.name), "scene": scene, "position": (child as Node2D).position, "values": {}, "points": [], "traits": {}}
+		for key: String in values:
+			set_value(object, key, values[key])
 		for part: Node in child.get_children():
 			if part is Marker2D:
 				object["points"].append((child as Node2D).position + (part as Marker2D).position)
-			elif part.scene_file_path == DROPPER:
-				object["dropper"] = values_of(part)
+			elif ChaseKinds.traits_of(scene).has(part.scene_file_path) and not kind_traits(scene).has(part.scene_file_path):
+				object["traits"][part.scene_file_path] = values_of(part)
 		objects.append(object)
 	var dark: Node = root.get_node_or_null("Darkness")
 	settings["dark"] = dark != null
@@ -308,13 +386,13 @@ func build(base: String, state: PackedScene.GenEditState = PackedScene.GEN_EDIT_
 			node.name = object["name"]
 			node.owner = root
 		node.position = object["position"]
-		_write_values(node, object["values"])
+		_write_values(node, all_values(object))
 		_write_points(node, object["points"], root)
-		_write_dropper(node, object["dropper"], root, state)
+		_write_traits(node, object, root, state)
 	for object: Dictionary in objects:
-		if object["values"].has("targets"):                       # 出口「指定」的目標：物件都放好才連得到
+		if defaults_of(object["scene"]).has("targets"):           # 出口「指定」的目標：物件都放好才連得到
 			var targets: Array[Node] = []
-			for target: String in object["values"]["targets"]:
+			for target: String in value(object, "targets"):
 				if root.has_node(target):
 					targets.append(root.get_node(target))
 			root.get_node(String(object["name"])).set("targets", targets)
@@ -385,21 +463,25 @@ func _write_points(node: Node2D, points: Array, root: Node) -> void:
 		markers[i].position = (points[i] as Vector2) - node.position
 
 
-func _write_dropper(node: Node, values: Dictionary, root: Node, state: PackedScene.GenEditState) -> void:
-	var dropper: Node = null
-	for child: Node in node.get_children():
-		if child.scene_file_path == DROPPER:
-			dropper = child
-	if values.is_empty():
-		if dropper != null:
-			node.remove_child(dropper)
-			dropper.free()
-		return
-	if dropper == null:
-		dropper = (load(DROPPER) as PackedScene).instantiate(_part(state))
-		node.add_child(dropper)
-		dropper.owner = root
-	_write_values(dropper, values)
+## 這一個自己多的特性（種類本來就有的不動）
+func _write_traits(node: Node, object: Dictionary, root: Node, state: PackedScene.GenEditState) -> void:
+	var wanted: Dictionary = object["traits"]
+	for path: String in ChaseKinds.traits_of(object["scene"]):
+		if kind_traits(object["scene"]).has(path):
+			continue
+		var part: Node = null
+		for child: Node in node.get_children():
+			if child.scene_file_path == path:
+				part = child
+		if part != null and not wanted.has(path):
+			node.remove_child(part)
+			part.free()
+		elif wanted.has(path):
+			if part == null:
+				part = (load(path) as PackedScene).instantiate(_part(state))
+				node.add_child(part)
+				part.owner = root
+			_write_values(part, wanted[path])
 
 
 func _write_settings(root: Node, state: PackedScene.GenEditState) -> void:
