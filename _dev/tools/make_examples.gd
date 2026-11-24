@@ -177,6 +177,8 @@ func _build_tower_defense() -> Node2D:
 	var map: TDMap = _td_map("default", [Vector2i(1, 8)], [Vector2i(34, 8)])
 	_td_map("two_gates", [Vector2i(1, 3), Vector2i(1, 13)], [Vector2i(34, 3), Vector2i(34, 13)])
 	_fixed_route_map()
+	for map_name: String in ["two_gates", "fixed_route"]:         # 另外兩張地圖做成關卡（繼承 tower_defense.tscn）；已經有就不動
+		TDLevelMaker.make("res://examples/tower_defense/maps/%s.tres" % map_name, "res://examples/tower_defense/waves/default.tres")
 	# 地板、尋路地圖：MapLoader 遊戲開始時會照地圖大小重鋪地板、重建尋路地圖；這裡先鋪預設地圖的大小
 	var tileset: TileSet = load(TILESET)
 	var floor_layer: TileMapLayer = _add(TileMapLayer.new(), "Floor", _root)

@@ -369,6 +369,7 @@ func _test_tower_defense() -> void:
 	await _test_map_editor()
 	await _test_wave_page()
 	await _test_enemy_page()
+	await _test_td_levels()
 
 
 ## 打得壞的牆：堵死會拆、繞路便宜就繞、成本高低決定、多隻一起打、飛行怪不理牆、沼澤上的牆、不能斜鑽
@@ -1184,6 +1185,44 @@ func _test_enemy_page() -> void:
 	TDEnemyPage.dirty = false
 	TDWavePage.editing = null
 	editor.set("editing", null)
+
+
+## 做成關卡：繼承 tower_defense.tscn、換地圖和波次；要先存檔；不會蓋掉；範例的兩個關卡玩得起來
+func _test_td_levels() -> void:
+	for level_name: String in ["two_gates", "fixed_route"]:
+		await _load("res://examples/tower_defense/levels/%s.tscn" % level_name)
+		Engine.time_scale = TIME_SCALE
+		var loader: MapLoader = _level.get_node("MapLoader")
+		var spawner: Spawner = _level.get_node("Spawner")
+		var grid: PathGrid = get_tree().get_first_node_in_group("path_grid")
+		_expect(loader.map.resource_path.ends_with(level_name + ".tres") and spawner.wave_table.resource_path.ends_with("waves/default.tres") and loader.camera != null and loader.spawners.size() == 1, "關卡 %s：換了地圖，其他繼承 tower_defense.tscn" % level_name)
+		_expect(not loader.bases.is_empty() and grid.has_path(spawner.global_position, loader.bases[0].global_position), "關卡 %s：怪走得到基地" % level_name)
+
+	TDWavePage.editing = null
+	await _load("res://examples/tower_defense/map_editor/map_editor.tscn")
+	var editor: Node2D = _level
+	editor.call("_new")
+	_expect(String(editor.call("make_level")).is_empty(), "新地圖還沒存檔：不能做成關卡")
+	(editor.get("_name_edit") as LineEdit).text = "_test_level_map"
+	var map_path: String = editor.call("save_map")
+	var page: TDWavePage = editor.get("_wave_page")
+	page.add_wave()
+	_expect(String(editor.call("make_level")).is_empty(), "波次改了沒存檔：不能做成關卡")
+	(page.get("_name_edit") as LineEdit).text = "_test_level_waves"
+	var waves_path: String = page.save()
+	var path: String = editor.call("make_level")
+	_expect(path.ends_with("levels/_test_level_map__test_level_waves.tscn") and FileAccess.file_exists(path), "做成關卡：檔名＝地圖名＋波次名")
+	_expect(String(editor.call("make_level")).is_empty(), "已經有這一關：不會蓋掉")
+	var made: Node = (load(path) as PackedScene).instantiate() if not path.is_empty() else null
+	_expect(made != null and (made.get_node("MapLoader") as MapLoader).map.resource_path == map_path and (made.get_node("Spawner") as Spawner).wave_groups().size() == 7 and made.has_node("HUD/BuildBar"), "做出來的關卡：地圖、波次是剛剛存的，其他都在")
+	if made != null:
+		made.free()
+	for file: String in [map_path, waves_path, path]:
+		if not file.is_empty():
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(file))
+	TDWavePage.editing = null
+	editor.set("editing", null)
+	editor.set("resume_test", false)
 
 
 # ---- 戰棋 ----

@@ -1,0 +1,13 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://examples/tower_defense/levels/tower_defense.tscn" id="1_base"]
+[ext_resource type="Resource" path="res://examples/tower_defense/waves/default.tres" id="2_waves"]
+[ext_resource type="Resource" path="res://examples/tower_defense/maps/fixed_route.tres" id="3_map"]
+
+[node name="fixed_route" instance=ExtResource("1_base")]
+
+[node name="Spawner" parent="."]
+wave_table = ExtResource("2_waves")
+
+[node name="MapLoader" parent="."]
+map = ExtResource("3_map")

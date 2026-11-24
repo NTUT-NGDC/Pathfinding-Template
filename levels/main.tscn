@@ -21,7 +21,7 @@ offset_bottom = 380.0
 theme_override_font_sizes/font_size = 22
 text = "這是主場景範本（levels/main.tscn）
 主場景負責人：把 features/ 做好的功能拖進來組裝
-想從範例開始：把 game_config.tres 的 Start Scene 改成 examples/ 裡的場景
+想從範例開始：把 game_config.tres 的 Levels 換成 examples/ 裡的場景
 按 Esc 或右上角「選單」暫停"
 horizontal_alignment = 1
 

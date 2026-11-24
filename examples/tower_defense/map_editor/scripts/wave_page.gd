@@ -225,6 +225,12 @@ func save() -> String:
 	return path
 
 
+## 現在這份波次存在哪個檔案（還沒存過＝空字串）
+func saved_path() -> String:
+	var path: String = WAVES_DIR + table.table_name.validate_filename() + ".tres"
+	return path if ResourceLoader.exists(path) else ""
+
+
 func load_table(path: String) -> bool:
 	var loaded: WaveTable = ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE) as WaveTable
 	if loaded == null:

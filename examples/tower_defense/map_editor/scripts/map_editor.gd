@@ -4,6 +4,7 @@ extends Node2D
 ##   ・波次：一波一波出什麼怪（wave_page.gd），存成 waves/名稱.tres，拖進關卡 Spawner 的 Wave Table
 ##   ・怪物：改怪的數值、掛件（enemy_page.gd），存成 features/enemies/ 的場景
 ## 三頁共用上一步／下一步和試玩（試玩用現在畫的地圖＋現在排的波次）。
+## 「做成關卡」：把存好的地圖＋波次做成一個關卡場景（level_maker.gd），再拖進 game_config.tres 的 Levels 就能串關。
 ##
 ## 地圖頁：
 ##   ・下面第一排選要畫什麼：岩石（怪不能走、不能蓋）、沼澤（怪走得慢）、高地（怪不能走、可以蓋塔）、
@@ -574,6 +575,29 @@ func load_map(path: String) -> bool:
 	return true
 
 
+## 把現在的地圖＋波次做成關卡場景。回傳存到哪裡（失敗＝空字串）
+func make_level() -> String:
+	_commit_pages()
+	var map_path: String = MAPS_DIR + saved_name.validate_filename() + ".tres"
+	if is_dirty() or not ResourceLoader.exists(map_path):
+		_say("地圖還沒存檔，先到「地圖」頁按存檔")
+		return ""
+	var waves_path: String = _wave_page.saved_path()
+	if _wave_page.is_dirty() or waves_path.is_empty():
+		_say("波次還沒存檔，先到「波次」頁按存檔")
+		return ""
+	var path: String = TDLevelMaker.path_for(map_path, waves_path)
+	var error: Error = TDLevelMaker.make(map_path, waves_path)
+	if error == ERR_ALREADY_EXISTS:
+		_say("已經有這一關了：%s（它會自動用最新存檔的地圖和波次，不用重做）" % path)
+		return ""
+	if error != OK:
+		_say("做不了：%s（匯出的遊戲不能存，要在 Godot 編輯器裡按 F6）" % error_string(error))
+		return ""
+	_say("做好了：%s，拖進 game_config.tres 的 Levels 就能串關" % path.get_file())
+	return path
+
+
 ## maps/ 裡有哪些地圖
 func map_files() -> PackedStringArray:
 	var files: PackedStringArray = PackedStringArray()
@@ -648,6 +672,8 @@ func _build_ui() -> void:
 	_button(row, "↷", redo).tooltip_text = "下一步（Ctrl＋Y）"
 	row.add_child(VSeparator.new())
 	TDEditorStyle.paint(_button(row, "▶ 試玩", start_test), TDEditorStyle.PLAY)
+	row.add_child(VSeparator.new())
+	_button(row, "做成關卡", make_level).tooltip_text = "把現在的地圖＋波次（都要先存檔）做成一個關卡場景"
 	# 試玩時才出現的「停止試玩」（另一層，編輯的介面藏起來時它還在）
 	var top: CanvasLayer = CanvasLayer.new()
 	top.layer = 25                                                # 在 HUD（20）上面、暫停選單（30）下面

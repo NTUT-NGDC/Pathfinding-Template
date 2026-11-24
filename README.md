@@ -22,7 +22,7 @@
 2. 每個人 clone 下來，用 Godot 匯入 `project.godot`
 3. 按 `F5`：標題 → 開始遊戲會進**追逐範例**，按 Esc 暫停
 4. 三個範例都玩一下，全組一起填 **[docs/game_overview.md](docs/game_overview.md)**：一句話（經典玩法＋變化）、從哪個範例改、分工表
-5. 把 `game_config.tres` 的 Start Scene 改成你們的主場景，開工！
+5. 把 `game_config.tres` 的 Levels 換成你們的主場景，開工！
 
 **已經用起手包開好 repo 了**：把這裡的 `addons/ngdc_pathfinding/` 整個資料夾複製到你們專案的 `addons/` 就能用（不用改 `project.godot`）。想參考範例的話，`examples/` 也可以一起複製。
 
@@ -46,9 +46,10 @@
 
 | 想改什麼 | 改哪裡 |
 | --- | --- |
-| 遊戲名稱、標語、按「開始遊戲」進去的場景、製作名單 | 雙擊 **`game_config.tres`**，在檢查器改 |
+| 遊戲名稱、標語、關卡、製作名單 | 雙擊 **`game_config.tres`**，在檢查器改 |
 | 你負責的功能 | `features/<功能名稱>/`（只改你自己的資料夾） |
 | 主場景 | `levels/`（指定一個人負責）；從範例改的話，把範例的場景複製到 `levels/` |
+| 關卡：按「開始遊戲」要進去的場景 | 雙擊 **`game_config.tres`**，把關卡場景依序拖進 Levels。一關就直接進去；兩關以上會有關卡選擇、下一關、過關解鎖 |
 | 標題畫面的背景圖、字的顏色 | `core/screens/title_screen.tscn` 的檢查器（只改外觀） |
 
 贏了、輸了：程式裡呼叫 `GameFlow.win("訊息")`、`GameFlow.lose("訊息")`，或在檢查器把 signal 連過去。
