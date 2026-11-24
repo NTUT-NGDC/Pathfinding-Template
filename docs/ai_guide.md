@@ -71,7 +71,7 @@ game_config.tres   遊戲名稱、關卡（Levels）、Credits 名單
 | 跟著路徑走 `PathFollower` | 放在角色底下，`go_to(位置)`、`follow(節點)`、`walk(路)`（照指定的路走）、`stop()`、`remaining_distance()`（還有多遠到終點）；地圖變了自動改路 |
 | 視野 `VisionSensor` | 距離 → 角度 → 射線；`target_seen`／`target_lost`、`sees_target` |
 | 聲音 `SoundBus`＋耳朵 `Ear` | `SoundBus.emit_sound(位置, 範圍)`；Ear 發 `heard(position)` |
-| 追逐 AI `ChaseAI` | 巡邏、查看、懷疑、追擊、搜尋，視野、聽力、警戒值、記住最後位置**都在裡面**；Marker2D 子節點當巡邏點；`state_changed(state)`、`caught(target)` |
+| 追逐 AI `ChaseAI` | （都在 group `chase_ai`）巡邏、查看、懷疑、追擊、搜尋，視野、聽力、警戒值、記住最後位置**都在裡面**；Marker2D 子節點當巡邏點；`state_changed(state)`、`caught(target)` |
 | 移動範圍 `MoveRange` | `show_from(位置, 移動力)`、`reachable_cells()`、`path_to(cell)`、`tile_selected(cell)`；每個角色的規則不一樣用 `cost_rule`、`stop_rule` |
 | 點擊移動 `ClickMover` | 點選／框選 group「units」的角色，點地圖就走 |
 | 生怪器 `Spawner`＋小怪 `Walker` | 波次表（`Wave` 資源）、目標；`reached_goal`、`all_cleared` |
@@ -189,4 +189,4 @@ godot --headless --path . res://core/level_editor/map_text.tscn -- new res://lev
 - 最後一行寫**改了哪些檔案**，方便他們合併
 - 使用者講得模糊（「做一個塔防」）、或說「先問我問題」：照 [ai_questions.md](ai_questions.md) 問，不要直接動手
 - 使用者大多沒有程式背景：做好了怎麼回報、怎麼教他用編輯器，照 ai_questions.md 的「做一張卡」；他問了才講程式
-- 做完一個功能，提醒使用者 commit、合併（每 20～30 分鐘合併一次）
+- 做完一張卡、或每 20 分鐘，照 [ai_git.md](ai_git.md) 帶他「同步」
