@@ -21,7 +21,7 @@
 1. **一組一個人**按上方綠色的 **Use this template → Create a new repository**，開你們組的 repo，再把組員加成 Collaborator
 2. 每個人 clone 下來，用 Godot 匯入 `project.godot`
 3. 按 `F5`：標題 → 開始遊戲會進**追逐範例**，按 Esc 暫停
-4. 三個範例都玩一下，全組一起填 **[docs/game_overview.md](docs/game_overview.md)**：一句話（經典玩法＋變化）、從哪個範例改、分工表
+4. 三個範例都玩一下，全組一起填 **[docs/game_overview.md](docs/game_overview.md)**：一句話（經典玩法＋變化）、從哪個範例改、分工表。有 AI 的話，跟它說「我想做遊戲，先問我問題」，答完選擇題它會幫你們填好
 5. 把 `game_config.tres` 的 Levels 換成你們的主場景，開工！
 
 **已經用起手包開好 repo 了**：把這裡的 `addons/ngdc_pathfinding/` 整個資料夾複製到你們專案的 `addons/` 就能用（不用改 `project.godot`）。想參考範例的話，`examples/` 也可以一起複製。
