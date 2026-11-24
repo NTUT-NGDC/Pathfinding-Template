@@ -52,7 +52,7 @@ const CONE_COLORS: Array[Color] = [
 @export_range(10, 400, 5, "suffix:px/s") var chase_speed: float = 150.0
 ## 反應時間：看到目標後，警戒值從 0 到滿（開始追）要幾秒。0＝一看到就追
 @export_range(0.0, 5.0, 0.1, "suffix:秒") var reaction_time: float = 1.0
-## 追丟之後，在最後看到的地方找幾秒才放棄
+## 追丟之後，走到最後看到的地方，到了再找幾秒才放棄
 @export_range(0.0, 15.0, 0.5, "suffix:秒") var search_time: float = 4.0
 ## 轉頭速度（度／秒）。越慢越容易從旁邊溜過去
 @export_range(30, 1080, 10, "suffix:°/s") var turn_speed: float = 300.0
@@ -64,6 +64,8 @@ const CONE_COLORS: Array[Color] = [
 @export_group("開關")
 ## 有耳朵：聽到聲音會過去查看
 @export var has_hearing: bool = true
+## 聽到就追：聽到聲音用追擊速度衝過去（算追擊 !），到了沒看到人就搜尋。關掉 → 只是走過去查看
+@export var chase_on_sound: bool = false
 ## 牆會擋視線。關掉 → 隔著牆也看得到
 @export var walls_block_sight: bool = true
 ## 檢查角度。關掉 → 背後也長眼睛
@@ -122,6 +124,8 @@ var _look_center: Vector2 = Vector2.RIGHT
 var _look_time: float = 0.0
 ## 親眼看到目標躲進去的地方
 var _grab_spot: Node2D
+## 正在衝向聲音（聽到就追），還沒看到目標
+var _rushing: bool = false
 ## 崗位：沒有巡邏點時，閒下來就回到這裡、面向一開始的方向
 var _home: Vector2
 var _home_facing: Vector2
@@ -190,7 +194,10 @@ func update_state(delta: float) -> void:
 		return
 	if state == State.CHASE:
 		if sees:
-			pass                                                  # 追擊中：PathFollower 會一直跟著目標
+			if _rushing:
+				_enter_chase()                                    # 衝過去的路上看到了：改成跟著目標
+		elif _rushing and _mover.is_moving():
+			pass                                                  # 還沒衝到聲音的位置
 		elif remember_last_position:
 			_enter_search()                                       # 追丟了：去最後看到的地方找
 		else:
@@ -314,8 +321,13 @@ func _on_target_hid(spot: Node2D) -> void:
 
 
 func _on_heard(sound_position: Vector2) -> void:
-	if state == State.CHASE or state == State.SUSPICIOUS or _grab_spot != null:
-		return                                                    # 正在追、正在盯著看：不理聲音
+	if _grab_spot != null or _vision.sees_target:
+		return                                                    # 正盯著目標、正要去抓：不理聲音
+	if chase_on_sound:
+		_enter_rush(sound_position)
+		return
+	if state == State.CHASE or state == State.SUSPICIOUS:
+		return
 	_set_state(State.INVESTIGATE)
 	_reset_look()
 	_mover.go_to(sound_position)
@@ -332,7 +344,17 @@ func _enter_patrol() -> void:
 func _enter_chase() -> void:
 	_set_state(State.CHASE)
 	alert = 1.0
+	_rushing = false
 	_mover.follow(_target)                                        # 一直追著目標（每 0.2 秒重算一次路）
+
+
+## 聽到就追：衝到聲音的位置（路上又聽到別的聲音就改衝那裡）
+func _enter_rush(sound_position: Vector2) -> void:
+	_set_state(State.CHASE)
+	alert = 1.0
+	_rushing = true
+	_last_seen = sound_position
+	_mover.go_to(sound_position)
 
 
 func _enter_search() -> void:
@@ -342,6 +364,7 @@ func _enter_search() -> void:
 
 
 func _reset_look() -> void:
+	_rushing = false
 	_looking = false
 	_look_timer = 0.0
 	_look_time = 0.0

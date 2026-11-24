@@ -291,6 +291,7 @@ func _test_chase_editor() -> void:
 	made.free()
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(copy_path))
 
+	_test_map_text()
 	await _load("res://examples/chase/map_editor/map_editor.tscn")
 	var editor: Node2D = _level
 	var panel: ChaseObjectPanel = editor.get("_panel")
@@ -385,6 +386,32 @@ func _test_chase_editor() -> void:
 	await _test_categories(editor)
 	await _test_kinds(editor)
 	LevelEditor.forget_sessions()
+
+
+## 關卡 ↔ 文字
+func _test_map_text() -> void:
+	var map: ChaseMap = ChaseMap.read(CHASE)
+	var before: Dictionary = map.snapshot()
+	var text: String = MapText.to_text(map)
+	_expect(MapText.apply(map, text).is_empty() and map.snapshot() == before, "轉成文字再寫回去：一模一樣")
+	_expect(map.text_warning().is_empty(), "範例關卡沒有要提醒的%s" % map.text_warning())
+	_expect(not MapText.apply(map, "....\ndragon: 1,1").is_empty() and not MapText.apply(map, "....\npatrol 1,0: 2,0").is_empty() and map.snapshot() == before, "文字寫錯：說哪裡錯，關卡不動")
+
+	map = ChaseMap.new()
+	map.map_name = "_test_text"
+	var drawn: String = "// 說明\n##########\n#....#...#\n#.tt.#.B.#\n#....#~..#\n##########\nplayer: 1,1\nexit: 9,2\ndoor_red: 5,2\nkey_red: 1,3\ntreasure: 8,1\nhound: 7,3\nenemy: 6,1\npatrol 7,3: 8,3 6,3\n"
+	_expect(MapText.apply(map, drawn).is_empty() and map.text_warning().is_empty(), "從文字畫一關%s" % map.text_warning())
+	_expect(map.tile_at(Vector2i(7, 2)) == ChaseMap.Tile.BUSH and map.tile_at(Vector2i(6, 3)) == ChaseMap.Tile.SWAMP and not map.walls.has(Vector2i(5, 2)), "地形；門寫在牆上會開缺口")
+	var door: Dictionary = map.object_named("DoorRed")
+	_expect(ChaseMap.value(door, "locked") == true and ChaseMap.value(door, "orientation") == 1 and ChaseMap.value(map.object_named("KeyRed"), "required") == false, "紅門上鎖、方向照牆；鑰匙不算目標")
+	_expect((map.object_named("Hound")["points"] as Array).size() == 2 and map.object_named("Enemy")["scene"] == ChaseMap.ENEMY, "獵犬有巡邏點")
+	var path: String = "res://examples/chase/levels/_test_text.tscn"
+	_expect(map.write(path) == OK and ChaseMap.read(path).snapshot() == map.snapshot(), "存成關卡場景，讀回來一樣")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	ChaseMap.set_value(map.object_named("Hound"), "chase_speed", 99.0)
+	text = MapText.to_text(map).replace("hound: 7,3", "hound: 8,3 6,3").replace("patrol 7,3", "patrol 8,3").replace("treasure: 8,1", "treasure: ")
+	_expect(MapText.apply(map, text).is_empty() and map.cell_of(map.object_named("Hound")["position"]) == Vector2i(8, 3) and ChaseMap.value(map.object_named("Hound"), "chase_speed") == 99.0 and map.count_of(ChaseMap.ENEMY) == 3 and map.object_named("Treasure").is_empty(), "移動、多放一隻、拿掉；自己改過的數值留著")
+	_expect(MapText.apply(map, MapText.to_text(map).replace("#.tt.", "#####")).is_empty() and map.text_warning().contains("KeyRed"), "玩家走不到鑰匙：會提醒")
 
 
 ## 工具分類：只看得到這一類的，數字鍵切換

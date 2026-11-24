@@ -4,7 +4,7 @@ extends Node
 ##    關掉「牆會擋視線」看得到 C；關掉「檢查角度」看得到 B；玻璃看得穿、草叢看不穿、躲起來看不到
 ## 2. 聽覺：範圍內聽得到、範圍外聽不到、倍率、關掉耳朵
 ## 3. 追逐 AI：巡邏來回、聽到聲音去查看、看到 → 懷疑 → 追擊、追丟 → 搜尋 → 巡邏、
-##    不記得最後位置 → 直接巡邏、追到就抓、看到躲進去會拖出來、沒看到就不會、關掉尋路會卡牆
+##    一開始隔著牆不會看到、聽到就追、不記得最後位置 → 直接巡邏、追到就抓、看到躲進去會拖出來、沒看到就不會、關掉尋路會卡牆
 ##
 ## 在命令列執行：
 ##   godot --headless --path . res://addons/ngdc_pathfinding/tests/chase_ai_test.tscn
@@ -30,7 +30,9 @@ func _ready() -> void:
 	await _test_hearing()
 	await _test_patrol()
 	await _test_investigate()
+	await _test_chase_on_sound()
 	await _test_suspicious_and_chase()
+	await _test_first_frame()
 	await _test_lose_sight()
 	await _test_catch()
 	await _test_hide_seen()
@@ -202,6 +204,48 @@ func _test_investigate() -> void:
 	_expect(killer.state == ChaseAI.State.PATROL, "關掉耳朵：聽到也不理")
 
 
+func _test_chase_on_sound() -> void:
+	print("--- 聽到就追（看不到的敵人） ---")
+	await _build(OPEN_MAP, Vector2i(18, 6))
+	_player.global_position = _center(Vector2i(18, 1))
+	var killer: ChaseAI = _spawn_killer(Vector2i(2, 3), 0.0, [])
+	killer.view_distance = 0.0
+	killer.chase_on_sound = true
+	killer.search_time = 1.0
+	var states: Array[ChaseAI.State] = []
+	killer.state_changed.connect(func(to: ChaseAI.State) -> void: states.append(to))
+	await _frames(2)
+	var start: Vector2 = killer.global_position
+	var sound_at: Vector2 = _center(Vector2i(12, 5))
+	SoundBus.emit_sound(sound_at, 600.0)
+	await _frames(1)
+	_expect(killer.state == ChaseAI.State.CHASE, "聽到 → 馬上算追擊")
+	await _frames(20)                                             # 遊戲時間 1 秒
+	_expect(killer.state == ChaseAI.State.CHASE and killer.global_position.distance_to(start) > killer.patrol_speed * 1.3, "用追擊速度衝（1 秒走了 %.0f px）" % killer.global_position.distance_to(start))
+	sound_at = _center(Vector2i(10, 1))
+	SoundBus.emit_sound(sound_at, 600.0)
+	await _wait_until(func() -> bool: return killer.global_position.distance_to(sound_at) < 10.0, 400)
+	_expect(killer.global_position.distance_to(sound_at) < 10.0, "路上又聽到別的聲音：改衝那裡")
+	await _wait_until(func() -> bool: return killer.state == ChaseAI.State.PATROL, 400)
+	_expect(states == [ChaseAI.State.CHASE, ChaseAI.State.SEARCH, ChaseAI.State.PATROL], "沒看到人 → 搜尋 → 回去巡邏")
+	SoundBus.emit_sound(_player.global_position, 600.0)
+	await _wait_until(func() -> bool: return _was_caught(), 400)
+	_expect(_was_caught(), "看不到也抓得到：衝過去碰到就抓")
+
+	await _build(OPEN_MAP, Vector2i(18, 6))
+	_player.global_position = _center(Vector2i(12, 5))
+	killer = _spawn_killer(Vector2i(2, 5), 180.0, [])             # 背對玩家
+	killer.chase_on_sound = true
+	killer.view_distance = 200.0
+	killer.remember_last_position = false
+	await _frames(2)
+	SoundBus.emit_sound(_center(Vector2i(8, 5)), 600.0)
+	await _wait_until(func() -> bool: return killer.global_position.distance_to(_player.global_position) < 190.0, 300)
+	_player.global_position += Vector2(-40, -70)                  # 離聲音的位置有一段距離
+	await _wait_until(func() -> bool: return _was_caught(), 200)
+	_expect(killer.state == ChaseAI.State.CHASE and _was_caught(), "衝過去的路上看到人：改成追人")
+
+
 func _test_suspicious_and_chase() -> void:
 	print("--- 看到玩家 ---")
 	await _build(OPEN_MAP, Vector2i(18, 6))
@@ -224,6 +268,32 @@ func _test_suspicious_and_chase() -> void:
 	killer.reaction_time = 0.0
 	await _frames(3)
 	_expect(killer.state == ChaseAI.State.CHASE, "反應時間 0：一看到就追")
+
+
+## 關卡剛載入：牆、敵人、玩家同一幀出現，牆的碰撞還沒準備好
+func _test_first_frame() -> void:
+	print("--- 剛載入 ---")
+	await _build(OPEN_MAP, Vector2i(18, 6))
+	var level: Node2D = Node2D.new()
+	for child: Node in _level.get_children():
+		if child is TileMapLayer or child is PathGrid:
+			child.queue_free()
+	var walls: TileMapLayer = TileMapLayer.new()
+	walls.tile_set = TILESET
+	for y: int in 8:
+		walls.set_cell(Vector2i(6, y), 0, Vector2i(2, 0))
+	level.add_child(walls)
+	var killer: ChaseAI = CHASE_SCENE.instantiate()
+	killer.lose_when_caught = false
+	killer.reaction_time = 0.0
+	killer.position = _center(Vector2i(4, 3))
+	level.add_child(killer)
+	_player.global_position = _center(Vector2i(8, 3))
+	var states: Array[ChaseAI.State] = []
+	killer.state_changed.connect(func(to: ChaseAI.State) -> void: states.append(to))
+	_level.add_child(level)
+	await _frames(10)
+	_expect(states.is_empty(), "牆的碰撞還沒準備好：不會隔牆看到")
 
 
 func _test_lose_sight() -> void:

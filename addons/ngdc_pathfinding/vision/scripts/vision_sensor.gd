@@ -50,6 +50,8 @@ var target: Node2D
 var sees_target: bool = false
 
 var _exclude: Array[RID] = []
+## 剛載入的前兩幀先不看：牆的碰撞還沒準備好，會隔牆看到
+var _frames_to_wait: int = 2
 var _drawer: Node2D
 
 
@@ -71,6 +73,9 @@ func _physics_process(_delta: float) -> void:
 	if follow_rotation:
 		facing = Vector2.from_angle(global_rotation)
 	_drawer.queue_redraw()
+	if _frames_to_wait > 0:
+		_frames_to_wait -= 1
+		return
 	if target == null or not is_instance_valid(target):
 		target = get_tree().get_first_node_in_group(target_group) as Node2D
 		if target == null:

@@ -22,13 +22,12 @@ const THINGS: Array[Array] = [
 	["寶物", FEATURES + "pickup/pickup.tscn", "Treasure", {}, "目標"],
 	["鑰匙", FEATURES + "pickup/pickup.tscn", "Key", {"kind": "紅", "required": false}, "目標"],
 	["任務點", FEATURES + "task_point/task_point.tscn", "TaskPoint", {}, "目標"],
-	["門", FEATURES + "door/door.tscn", "Door", {}, "機關"],
+	["門", ChaseMap.DOOR, "Door", {}, "機關"],
 	["躲藏點", FEATURES + "hiding_spot/hiding_spot.tscn", "HidingSpot", {}, "機關"],
 	["捕獸夾", FEATURES + "trap/trap.tscn", "Trap", {}, "機關"],
 	["警報", FEATURES + "alarm/alarm.tscn", "Alarm", {}, "機關"],
 	["瓶子", FEATURES + "throwable/bottle.tscn", "Bottle", {}, "機關"],
 ]
-const DOOR: String = FEATURES + "door/door.tscn"
 
 ## 現在的關卡（跟 map 是同一個，型別清楚一點）
 var chase: ChaseMap:
@@ -171,17 +170,14 @@ func place(cell: Vector2i) -> bool:
 	if scene == ChaseMap.PLAYER and chase.count_of(scene) > 0:
 		say("已經有玩家了（用「選取」拖著移動）")
 		return false
-	var is_door: bool = scene == DOOR or scene == ChaseMap.EXIT
+	var is_door: bool = ChaseMap.is_door(scene)
 	if chase.walls.get(cell, -1) in [ChaseMap.Tile.WALL, ChaseMap.Tile.GLASS] and not is_door:
 		say("牆上不能放（門和出口可以）")
 		return false
 	remember()
 	var values: Dictionary = (item[3] as Dictionary).duplicate()
 	if is_door:
-		chase.walls.erase(cell)                                   # 門開在牆上：把那格牆拿掉，方向照旁邊的牆
-		values["orientation"] = 0 if chase.walls.has(cell + Vector2i.LEFT) and chase.walls.has(cell + Vector2i.RIGHT) else 1
-		if not chase.floors.has(cell):
-			chase.floors[cell] = ChaseMap.Tile.WOOD
+		values["orientation"] = chase.open_doorway(cell)
 	var base_name: String = item[2] if scene == item[1] else scene.get_file().get_basename().to_pascal_case().validate_node_name()
 	var made: int = chase.add_object(scene, chase.center_of(cell), base_name, values)
 	chase.emit_changed()
@@ -225,10 +221,7 @@ func unplace(cell: Vector2i) -> bool:
 
 func delete_object(index: int) -> void:
 	remember()
-	for object: Dictionary in chase.objects:                      # 出口「指定」的目標也拿掉
-		if object["values"].has("targets"):
-			ChaseMap.set_target(object, chase.objects[index]["name"], false)
-	chase.objects.remove_at(index)
+	chase.remove_object(index)
 	chase.emit_changed()
 	select(-1)
 

@@ -49,5 +49,7 @@ func _preview_text(preview: Node2D) -> String:
 		lines.append("比玩家跑步快：被看到只能躲")
 	elif ai.chase_speed <= float(player["walk_speed"]):
 		lines.append("比玩家走路慢：用走的就甩得掉")
+	if ai.has_hearing and ai.chase_on_sound:
+		lines.append("聽到就衝過來")
 	lines.append("看到 %s 秒後開始追" % str(snappedf(ai.reaction_time, 0.1)).trim_suffix(".0"))
 	return "\n".join(lines) + "\n\n存檔後，地圖上這一種全部跟著改"

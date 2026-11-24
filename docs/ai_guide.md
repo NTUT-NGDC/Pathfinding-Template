@@ -71,13 +71,27 @@ game_config.tres   遊戲名稱、關卡（Levels）、Credits 名單
 | 跟著路徑走 `PathFollower` | 放在角色底下，`go_to(位置)`、`follow(節點)`、`walk(路)`（照指定的路走）、`stop()`、`remaining_distance()`（還有多遠到終點）；地圖變了自動改路 |
 | 視野 `VisionSensor` | 距離 → 角度 → 射線；`target_seen`／`target_lost`、`sees_target` |
 | 聲音 `SoundBus`＋耳朵 `Ear` | `SoundBus.emit_sound(位置, 範圍)`；Ear 發 `heard(position)` |
-| 追逐 AI `ChaseAI` | 巡邏、查看、懷疑、追擊、搜尋；Marker2D 子節點當巡邏點；`caught(target)` |
+| 追逐 AI `ChaseAI` | 巡邏、查看、懷疑、追擊、搜尋，視野、聽力、警戒值、記住最後位置**都在裡面**；Marker2D 子節點當巡邏點；`state_changed(state)`、`caught(target)` |
 | 移動範圍 `MoveRange` | `show_from(位置, 移動力)`、`reachable_cells()`、`path_to(cell)`、`tile_selected(cell)`；每個角色的規則不一樣用 `cost_rule`、`stop_rule` |
 | 點擊移動 `ClickMover` | 點選／框選 group「units」的角色，點地圖就走 |
 | 生怪器 `Spawner`＋小怪 `Walker` | 波次表（`Wave` 資源）、目標；`reached_goal`、`all_cleared` |
 | 除錯顯示 `PathDebug` | 遊戲中按 F1～F5 |
 
-**要做敵人走路、找路、追人、出怪、移動範圍：用上面的積木，不要自己寫 A\*。** 想看 A\* 怎麼運作：`addons/ngdc_pathfinding/demo/astar_lab/`。
+**使用者講的是名詞，不代表要自己寫。** 先照這張表換成現成的：
+
+| 使用者說 | 用這個 |
+| --- | --- |
+| A\*、尋路、繞路、重算路徑 | `PathGrid`＋`PathFollower`（`follow()` 會自己每 `repath_interval` 秒重算） |
+| 路徑成本、走這裡比較貴 | `PathGrid.set_cost()`，或畫沼澤 |
+| BFS、移動範圍、走得到哪裡 | `MoveRange` |
+| 視野三關、視野錐、射線 | `VisionSensor` |
+| 會追人的敵人、警戒值、懷疑、最後已知位置、搜尋、巡邏、狀態機 | 繼承 `chase_ai/chase_ai.tscn` 的場景，**只改數值、不寫腳本**（照 `examples/chase/features/enemies/hound.tscn`）：警戒值＝`reaction_time`、追丟後找幾秒＝`search_time`（到了才開始算）、最後已知位置＝`remember_last_position`。多一個能力才寫：照 `enemy_traits/trap_dropper.tscn` 做成子節點 |
+| 聽覺、引開敵人 | `SoundBus.emit_sound()`；敵人用 `ChaseAI` 的 `hearing_multiplier`、`chase_on_sound` |
+| 波次、出怪 | `Spawner`＋`Wave` |
+
+會走的玩家也有現成的：`examples/chase/features/player/player.tscn`（走、跑、躲、丟瓶子），追人的東西都用它試，不用自己寫。要一張有牆的試玩場景：用下面「關卡轉文字」的 `new`（存到自己的資料夾也可以，例如 `new res://features/zombie/test.tscn`），牆、玩家、出口都有了，再把自己的場景加進去。
+
+**要做敵人走路、找路、追人、出怪、移動範圍：用上面的積木，不要自己寫 A\*、不要自己寫狀態機。** 想看 A\* 怎麼運作：`addons/ngdc_pathfinding/demo/astar_lab/`。
 
 ### 範例（`examples/`）
 
@@ -92,9 +106,9 @@ game_config.tres   遊戲名稱、關卡（Levels）、Credits 名單
 | 想改 | 看哪裡 |
 | --- | --- |
 | 追逐：新的目標、新的互動物件 | 照 `examples/chase/features/task_point/`（「目標」接口寫在 README 最下面），放在自己的資料夾 `examples/chase/features/名字/名字.tscn`；按 E 的東西掛 `examples/chase/features/interact/scripts/interactable.gd` |
-| 追逐：新的敵人、任務點……的種類 | 用編輯器的「敵人」「物件」頁，或寫一個繼承底的場景：敵人放 `examples/chase/features/enemies/`（繼承 `chase_ai.tscn`），其他放 `examples/chase/features/名字/kinds/`；名字寫 `metadata/display_name`，只寫跟底不一樣的欄位（照 `examples/chase/features/enemies/hound.tscn`）。敵人的欄位和範圍看 `chase_ai.gd` 的 `@export`：例如看不到 `view_distance = 0`、聽力 `hearing_multiplier` 0～3 |
+| 追逐：新的敵人、任務點……的種類 | 用編輯器的「敵人」「物件」頁，或寫一個繼承底的場景：敵人放 `examples/chase/features/enemies/`（繼承 `chase_ai.tscn`），其他放 `examples/chase/features/名字/kinds/`；名字寫 `metadata/display_name`，只寫跟底不一樣的欄位（照 `examples/chase/features/enemies/hound.tscn`）。敵人的欄位和範圍看 `chase_ai.gd` 的 `@export`：例如看不到 `view_distance = 0`、聽力 `hearing_multiplier` 0～3、聽到聲音就衝過來 `chase_on_sound = true`（沒開只會走過去查看，不算追擊） |
 | 追逐：新的敵人特性 | 照 `examples/chase/features/enemy_traits/trap_dropper.tscn`，一個特性＝一個場景＋一支腳本（`trait_name()`、`description()`、`labels()`），敵人頁會自動列出來。腳本放在敵人底下：`get_parent() as ChaseAI`，接 `state_changed(state)` 知道牠在做什麼（`ChaseAI.State.CHASE`＝開始追、`SEARCH`＝追丟了……），`caught(target)`＝抓到；發出聲音用 `SoundBus.emit_sound(位置, 範圍)` |
-| 追逐：關卡 | 最好請使用者用編輯器（`examples/chase/map_editor/`，按「新地圖」就有一間能玩的房子）。你要自己做：**複製 `examples/chase/levels/chase.tscn` 再改**（PathGrid、Floor、Walls、Player、Exit、Darkness、FollowCamera、HUD 都要有）；`tile_map_data` 不能手寫，寫一個臨時場景用腳本 `set_cell()` 再存（圖塊 atlas x：0 木頭、1 磁磚、2 牆、3 玻璃、4 草叢、5 沼澤；0、1、5 畫在 Floor，其他畫在 Walls）。兩邊可以輪流改。自己的物件放 `examples/chase/features/名字/名字.tscn`，編輯器的「自製」會列出來 |
+| 追逐：關卡 | 想畫得漂亮請使用者用編輯器（`examples/chase/map_editor/`）。你要做、要改：**用文字畫**（看下面），不要手寫 `tile_map_data`。數值用編輯器，或在關卡 `.tscn` 那個節點底下加一行（例如 Exit 的 `open_when = 3`，欄位看它的腳本）。自己的物件放 `examples/chase/features/名字/名字.tscn`，編輯器的「自製」會列出來 |
 | 塔防：新的怪物掛件、砲塔掛件 | 照 `examples/tower_defense/features/enemy_traits/`、`examples/tower_defense/features/tower_traits/` 裡現成的，一個掛件＝一個場景＋一支腳本，編輯器會自動列出來 |
 | 塔防：蓋東西、升級的規則 | `examples/tower_defense/features/builder/scripts/builder.gd`、`examples/tower_defense/features/tower/scripts/` |
 | 戰棋：新的特性 | 照 `examples/tactics/features/unit_traits/`，繼承 `UnitTrait`，覆寫需要的函式（`modify_attack()`、`turn_started()`、`after_attack()`……），編輯器會自動列出來。中毒、燃燒這種掛在對方身上的狀態看戰棋 README 最下面 |
@@ -107,6 +121,15 @@ game_config.tres   遊戲名稱、關卡（Levels）、Credits 名單
 怪物、掛件、職業、特性的資料夾（`enemies/`、`enemy_traits/`、`tower_traits/`、`units/`、`unit_traits/`、`kinds/`）**第一層的 `.tscn` 都會被編輯器列出來**，測試場景放子資料夾。
 
 **塔防、戰棋的地圖（`maps/*.tres`）不要用文字編輯，也不要整份讀**：地形存成編碼過的資料，一張幾十 KB。要看、要改地形先轉成文字：`godot --headless --path . res://core/level_editor/map_text.tscn -- export res://examples/tactics/maps/default.tres 檔案.txt`，改完把 `export` 換成 `import` 寫回去（圓滑的邊緣、小隊、規則都會留著；新地圖用 `new`，看 [關卡編輯器的 README](../core/level_editor/README.md)）。想畫得漂亮請使用者開 `map_editor/`。一張地圖同一時間只有一個人改，衝突時選一邊，不能合併。
+
+**追逐的關卡（`levels/*.tscn`）也可以轉成文字**：地形一格一個字，下面一行一種物件。最後要多加一個腳本：
+
+```
+godot --headless --path . res://core/level_editor/map_text.tscn -- export res://examples/chase/levels/chase.tscn 檔案.txt res://examples/chase/map_editor/scripts/chase_map.gd
+godot --headless --path . res://core/level_editor/map_text.tscn -- new res://levels/新關卡.tscn 檔案.txt res://examples/chase/map_editor/scripts/chase_map.gd
+```
+
+先 `export` 一次範例，看文字裡的說明和有哪些東西可以放（你做的敵人、任務點的種類也會出現，名字＝檔名）；`new` 做新的一關、`import` 改現有的。寫完會印「提醒」（少了什麼、玩家走不到哪個），**有提醒就改到沒有**。沒移動的物件，自己改過的數值會留著。
 
 ### 已經設定好的按鍵（`project.godot`，不用再加）
 

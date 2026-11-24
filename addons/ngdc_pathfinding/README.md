@@ -29,7 +29,7 @@ W3「尋路」的技術積木。每個積木都是一個場景，**拖進場景�
 | **跟著路徑走** `follower/path_follower.tscn` | 放在角色底下；`go_to(位置)` 或 `follow(節點)` 就會繞路走過去；`walk(路)` 照你給的路走 | 速度、重算間隔（預設 0.2 秒）、使用尋路、開門要幾秒 | `arrived`、`path_blocked` |
 | **視野** `vision/vision_sensor.tscn` | 距離 → 角度 → 射線三關，畫出被牆切掉的視野錐 | 距離、角度、牆會擋視線、檢查角度、目標 group、顯示視野錐 | `target_seen`、`target_lost` |
 | **耳朵** `hearing/ear.tscn` | 有人 `SoundBus.emit_sound(位置, 範圍)`，在範圍內就聽到 | 有沒有開、聽力倍率 | `heard(position)` |
-| **追逐 AI** `chase_ai/chase_ai.tscn` | 巡邏 → 查看聲音 → 懷疑 ? → 追擊 ! → 搜尋最後位置；底下加 Marker2D 當巡邏點 | 個性（視野、速度、反應時間、搜尋時間……）、開關（牆擋視線、檢查角度、記住最後位置、使用尋路）、抓到就輸 | `caught(target)`、`state_changed` |
+| **追逐 AI** `chase_ai/chase_ai.tscn` | 巡邏 → 查看聲音（走過去；開「聽到就追」會衝過去）→ 懷疑 ? → 追擊 ! → 搜尋最後位置；底下加 Marker2D 當巡邏點 | 個性（視野（看多遠 0＝看不到）、速度、反應時間、搜尋時間……）、開關（有耳朵、聽到就追、牆擋視線、檢查角度、記住最後位置、使用尋路）、抓到就輸 | `caught(target)`、`state_changed` |
 | **移動範圍** `move_range/move_range.tscn` | `show_from(位置, 移動力)` 亮出走得到的格子（吃移動成本）；`path_to(格子)` 拿到走過去的路；每隻規則不一樣（會飛、怕水、敵人擋路）就設 `cost_rule`、`stop_rule` | 顏色、能不能點 | `tile_selected(cell)`、`cancelled` |
 | **點擊移動** `click_move/click_mover.tscn` | 點選／框選角色（group「units」，底下要有 PathFollower），點地圖就走過去 | 可否多選、散開距離 | `selection_changed`、`commanded` |
 | **生怪器** `spawner/spawner.tscn` | 照波次表出怪，怪自動走向目標；`adopt(怪, 位置)` 把別的地方生出來的怪（例如分裂）也交給它管 | 目標、波次表（出幾隻、間隔、速度、血量）、走到就輸、打完就贏 | `wave_started`、`spawned`、`reached_goal`、`all_cleared` |

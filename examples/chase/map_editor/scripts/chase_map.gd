@@ -14,6 +14,7 @@ const NOT_OBJECTS: Array[String] = ["res://addons/ngdc_pathfinding/grid/path_gri
 const ENEMY: String = "res://addons/ngdc_pathfinding/chase_ai/chase_ai.tscn"
 const EXIT: String = "res://examples/chase/features/exit/exit.tscn"
 const PLAYER: String = "res://examples/chase/features/player/player.tscn"
+const DOOR: String = "res://examples/chase/features/door/door.tscn"
 const DARKNESS: String = "res://examples/chase/features/darkness/darkness.tscn"
 ## 每個物件自己的（不是種類的）：方向、巡邏、出口的目標
 const PER_OBJECT: Array[String] = ["orientation", "start_angle", "patrol_mode", "patrol_wait", "targets"]
@@ -158,6 +159,18 @@ func tile_at(cell: Vector2i) -> int:
 	return walls.get(cell, floors.get(cell, -1))
 
 
+## 門、出口開在這一格：把牆拿掉、補地板。回傳方向（0 橫、1 直），照旁邊的牆
+func open_doorway(cell: Vector2i) -> int:
+	walls.erase(cell)
+	if not floors.has(cell):
+		floors[cell] = Tile.WOOD
+	return 0 if walls.has(cell + Vector2i.LEFT) and walls.has(cell + Vector2i.RIGHT) else 1
+
+
+static func is_door(scene: String) -> bool:
+	return scene == DOOR or scene == EXIT
+
+
 ## 油漆桶：把 from 相連、看起來一樣的一整塊換成 tile。回傳換了幾格
 func fill(from: Vector2i, tile: int, erase: bool) -> int:
 	var area: Rect2i = Rect2i(Vector2i.ZERO, size)
@@ -230,6 +243,14 @@ static func set_kind(object: Dictionary, scene: String) -> void:
 			set_value(object, key, own[key])
 	for path: String in kind_traits(scene):
 		(object["traits"] as Dictionary).erase(path)
+
+
+## 拿掉一個物件（出口「指定」它的話也拿掉）
+func remove_object(index: int) -> void:
+	for object: Dictionary in objects:
+		if object["values"].has("targets"):
+			set_target(object, objects[index]["name"], false)
+	objects.remove_at(index)
 
 
 func _free_name(text: String) -> String:
@@ -305,6 +326,44 @@ func objective_names() -> PackedStringArray:
 			result.append(object["name"])
 		node.free()
 	return result
+
+
+# ---- 轉成文字（core/level_editor 的 MapText；物件在 chase_text.gd） ----
+
+func text_letters() -> Dictionary:
+	return ChaseText.LETTERS
+
+
+func text_kind(cell: Vector2i) -> int:
+	return tile_at(cell)
+
+
+func set_text_kind(cell: Vector2i, kind: int) -> void:
+	paint(cell, Tile.WOOD if kind < 0 else kind, kind < 0)
+
+
+func text_help() -> PackedStringArray:
+	return ChaseText.HELP
+
+
+func text_fields() -> PackedStringArray:
+	return ChaseText.fields(self)
+
+
+func text_cells(field: String) -> Array:
+	return ChaseText.cells(self, field)
+
+
+func set_text_cells(field: String, cells: Array) -> void:
+	ChaseText.set_cells(self, field, cells)
+
+
+func text_problem(points: Dictionary) -> String:
+	return ChaseText.problem(self, points)
+
+
+func text_warning() -> String:
+	return ChaseText.warning(self)
 
 
 # ---- 讀寫關卡場景 ----
