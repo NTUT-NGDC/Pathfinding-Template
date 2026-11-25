@@ -53,6 +53,25 @@ func start() -> void:
 	path.clear()
 
 
+## 同一張地圖、同樣的斜走設定，另外開一個（比賽用）
+func copy_map() -> GridSearch:
+	var copy: GridSearch = GridSearch.new()
+	copy.size = size
+	copy.walls = walls.duplicate()
+	copy.costs = costs.duplicate()
+	copy.start_cell = start_cell
+	copy.goal_cell = goal_cell
+	copy.allow_diagonal = allow_diagonal
+	copy.cut_corners = cut_corners
+	return copy
+
+
+## 一次找完
+func run_to_end() -> void:
+	while not finished:
+		step()
+
+
 ## 往外找一步：拿出一格 → 是終點就結束 → 不是就把旁邊的格子加進待探索
 func step() -> void:
 	if finished:
@@ -70,7 +89,7 @@ func step() -> void:
 	for next: Vector2i in neighbors(current):
 		if closed.has(next):
 			continue                                              # 已經找過了，不再改
-		var new_g: float = g[current] + _step_cost(current, next)
+		var new_g: float = g[current] + step_cost(current, next)
 		if algorithm == Algorithm.BFS:
 			if g.has(next):
 				continue                                          # BFS：水已經流過的格子不再流
@@ -145,12 +164,12 @@ func path_steps() -> int:
 func path_length() -> float:
 	var total: float = 0.0
 	for i: int in range(1, path.size()):
-		total += _step_cost(path[i - 1], path[i])
+		total += step_cost(path[i - 1], path[i])
 	return total
 
 
 ## 走一步的成本＝距離（直走 1、斜走 1.41）× 走進去那格的成本（沼澤比較貴）
-func _step_cost(a: Vector2i, b: Vector2i) -> float:
+func step_cost(a: Vector2i, b: Vector2i) -> float:
 	var distance: float = DIAGONAL_COST if a.x != b.x and a.y != b.y else 1.0
 	return distance * costs.get(b, 1.0)
 

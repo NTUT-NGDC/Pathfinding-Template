@@ -9,6 +9,7 @@ extends Node
 ## 7. 陷阱：權重 5 探索最少、路比權重 0 和 1 長；沼澤：權重 5 直穿沼澤、總成本比較高
 ## 8. 平手先挑 h 小的、待探索不重複、下一格跟 step() 真的探索的一樣
 ## 9. 實驗室場景打得開、按鈕按了不會當掉；沼澤成本、每格的算式、存讀地圖
+## 10. 走走看：秒數＝總成本 × 0.15；比賽：陷阱、沼澤的權重 5 最慢，0 和 1 並列；紀錄表、清空
 ##
 ## 在命令列執行：
 ##   godot --headless --path . res://addons/ngdc_pathfinding/tests/astar_lab_test.tscn
@@ -183,6 +184,11 @@ func _test_scene() -> void:
 	(lab.get_node("%AlgorithmOption") as OptionButton).item_selected.emit(1)
 	for i: int in 400:
 		(lab.get_node("%StepButton") as Button).pressed.emit()
+	await _test_walk(lab)
+	presets.select(1)
+	presets.item_selected.emit(1)
+	for i: int in 400:
+		(lab.get_node("%StepButton") as Button).pressed.emit()
 	var stats: Label = lab.get_node("%Stats")
 	_expect(stats.text.contains("探索了") and stats.text.contains("路徑長度"), "顯示探索格數和路徑長度（%s）" % stats.text.replace("\n", "／"))
 	await _test_cell_info(lab)
@@ -208,6 +214,50 @@ func _test_scene() -> void:
 	_expect(search.walls.has(Vector2i(5, 5)) and search.costs.has(Vector2i(6, 6)), "存檔再讀檔：牆和沼澤都還在")
 	_expect(search.costs[Vector2i(6, 6)] == 7.0 and (lab.get_node("%SwampSlider") as HSlider).value == 7.0, "存檔再讀檔：沼澤成本也還在")
 	lab.queue_free()
+
+
+func _test_walk(lab: Control) -> void:
+	var walkers: Control = lab.get_node("%Walkers")
+	var label: Label = lab.get_node("%WalkLabel")
+	var presets: OptionButton = lab.get_node("%PresetOption")
+	var weight: HSlider = lab.get_node("%WeightSlider")
+	var records: Array = lab.get("_records")
+	_expect(records.size() == 1 and records[0][0] == "U 形牆" and records[0][7] == "－", "找完自動記一列，秒數先空著")
+	(lab.get_node("%WalkButton") as Button).pressed.emit()
+	await get_tree().create_timer(1.0).timeout
+	_expect(walkers.running and label.text.contains("走路中"), "走走看：出發、計時（%s）" % label.text)
+	await walkers.all_arrived
+	_expect(label.text.contains("花了 3.75 秒") and absf(walkers.elapsed - 3.75) < 0.1, "U 形牆：花 3.75 秒（25 × 0.15，實際 %.2f）" % walkers.elapsed)
+	_expect(records.size() == 1 and records[0][7] == "3.75", "走完把秒數填進同一列")
+
+	for map_name: String in ["陷阱", "沼澤"]:
+		var index: int = AStarPresets.MAPS.keys().find(map_name)
+		presets.select(index)
+		presets.item_selected.emit(index)
+		(lab.get_node("%RaceButton") as Button).pressed.emit()
+		await walkers.all_arrived
+		_expect(is_equal_approx(walkers.time_of(0), walkers.time_of(1)) and walkers.time_of(2) > walkers.time_of(1), "比賽「%s」：權重 5 最慢（%.2f、%.2f、%.2f 秒）" % [map_name, walkers.time_of(0), walkers.time_of(1), walkers.time_of(2)])
+		var cells: PackedStringArray = []
+		for child: Label in (lab.get_node("%Ranking") as GridContainer).get_children():
+			cells.append(child.text)
+		_expect(cells.size() == 24 and cells[6] == "1" and cells[12] == "1" and cells[18] == "3" and cells[19] == "5", "排行：0 和 1 並列第 1、5 第 3（%s）" % " ".join(cells.slice(6)))
+	_expect(records.size() == 7 and records[6][0] == "沼澤" and records[6][3] == "3", "比賽的三隻都記下來（共 %d 列）" % records.size())
+
+	weight.value = 2.0
+	_expect(walkers.searches.is_empty() and label.text == "", "改設定：NPC 收起來")
+	weight.value = 1.0
+	var search: GridSearch = lab.get("search")
+	for y: int in search.size.y:
+		search.walls[Vector2i(12, y)] = true
+	(lab.get_node("%WalkButton") as Button).pressed.emit()
+	_expect(not walkers.running and label.text.contains("走不到"), "走不到：NPC 不出發")
+	(lab.get_node("%RaceButton") as Button).pressed.emit()
+	_expect(not walkers.running and label.text.contains("走不到"), "走不到：比賽不開始")
+	(lab.get_node("%RecordButton") as Button).pressed.emit()
+	_expect((lab.get_node("%RecordPanel") as Control).visible, "打得開紀錄表")
+	(lab.get_node("%RecordClearButton") as Button).pressed.emit()
+	(lab.get_node("%RecordCloseButton") as Button).pressed.emit()
+	_expect(records.is_empty() and not (lab.get_node("%RecordPanel") as Control).visible, "清空、關閉紀錄表")
 
 
 ## 滑鼠停在格子上：算式對得起來

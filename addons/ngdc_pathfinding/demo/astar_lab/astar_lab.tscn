@@ -2,6 +2,8 @@
 
 [ext_resource type="Script" path="res://addons/ngdc_pathfinding/demo/astar_lab/scripts/astar_lab.gd" id="1_script"]
 
+[ext_resource type="Script" path="res://addons/ngdc_pathfinding/demo/astar_lab/scripts/lab_walkers.gd" id="2_walkers"]
+
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
 content_margin_left = 22.0
 content_margin_top = 16.0
@@ -93,6 +95,17 @@ offset_top = 68.0
 offset_right = 888.0
 offset_bottom = 644.0
 
+[node name="Walkers" type="Control" parent="GridView"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("2_walkers")
+
 [node name="Hint" type="Label" parent="."]
 layout_mode = 0
 offset_left = 24.0
@@ -103,6 +116,51 @@ theme_override_colors/font_color = Color(0.75, 0.75, 0.8, 1)
 theme_override_font_sizes/font_size = 22
 text = "左鍵畫牆／沼澤、右鍵擦掉；拖曳綠色起點、紅色終點
 藍＝待探索　黃＝已探索　紫框＝下一格　紅線＝路徑"
+
+[node name="RecordPanel" type="PanelContainer" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 0
+offset_left = 24.0
+offset_top = 68.0
+offset_right = 888.0
+offset_bottom = 644.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
+
+[node name="VBox" type="VBoxContainer" parent="RecordPanel"]
+layout_mode = 2
+
+[node name="TopRow" type="HBoxContainer" parent="RecordPanel/VBox"]
+layout_mode = 2
+
+[node name="RecordTitle" type="Label" parent="RecordPanel/VBox/TopRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 22
+text = "紀錄表"
+
+[node name="RecordClearButton" type="Button" parent="RecordPanel/VBox/TopRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "清空紀錄"
+
+[node name="RecordCloseButton" type="Button" parent="RecordPanel/VBox/TopRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "關閉"
+
+[node name="Scroll" type="ScrollContainer" parent="RecordPanel/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="RecordGrid" type="GridContainer" parent="RecordPanel/VBox/Scroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+columns = 8
 
 [node name="SaveRow" type="HBoxContainer" parent="."]
 layout_mode = 0
@@ -234,14 +292,57 @@ theme_override_colors/font_color = Color(1, 0.85, 0.5, 1)
 theme_override_font_sizes/font_size = 22
 text = "探索了 0 格"
 
-[node name="CellSeparator" type="HSeparator" parent="Panel/VBox"]
-layout_mode = 2
-
-[node name="CellInfo" type="Label" parent="Panel/VBox"]
+[node name="Tabs" type="TabContainer" parent="Panel/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
-custom_minimum_size = Vector2(0, 210)
+size_flags_vertical = 3
+theme_override_font_sizes/font_size = 22
+
+[node name="CellInfo" type="Label" parent="Panel/VBox/Tabs"]
+unique_name_in_owner = true
+layout_mode = 2
 autowrap_mode = 3
 theme_override_font_sizes/font_size = 22
 text = "滑鼠停在格子上，
 看它的分數怎麼算"
+
+[node name="Walk" type="VBoxContainer" parent="Panel/VBox/Tabs"]
+layout_mode = 2
+visible = false
+
+[node name="Buttons" type="HBoxContainer" parent="Panel/VBox/Tabs/Walk"]
+layout_mode = 2
+
+[node name="WalkButton" type="Button" parent="Panel/VBox/Tabs/Walk/Buttons"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 22
+text = "走走看"
+
+[node name="RaceButton" type="Button" parent="Panel/VBox/Tabs/Walk/Buttons"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 22
+tooltip_text = "權重 0、1、5 三隻一起出發"
+text = "比賽"
+
+[node name="RecordButton" type="Button" parent="Panel/VBox/Tabs/Walk/Buttons"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 22
+text = "紀錄 0"
+
+[node name="WalkLabel" type="Label" parent="Panel/VBox/Tabs/Walk"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.5, 1)
+theme_override_font_sizes/font_size = 22
+
+[node name="Ranking" type="GridContainer" parent="Panel/VBox/Tabs/Walk"]
+unique_name_in_owner = true
+layout_mode = 2
+columns = 6
+theme_override_constants/v_separation = 0

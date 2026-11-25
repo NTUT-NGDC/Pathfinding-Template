@@ -2,6 +2,7 @@ extends Control
 ## A* 實驗室：在格子地圖上看 BFS／A* 一步一步怎麼找路。
 ## 左鍵畫牆或沼澤（上面選畫筆）、右鍵擦掉、拖曳綠色起點和紅色終點；右邊調演算法、估計權重、斜走、播放速度。
 ## 「顯示」選「分數的組成」：每格左上是走了多少 g、右上是還剩多少 h、下面大字是總分；滑鼠停在格子上看完整算式。
+## 「走走看」讓 NPC 照路走一次、計時；「比賽」讓權重 0、1、5 三隻一起走；每次的結果都記在紀錄表。
 ##
 ## 演算法本體在 grid_search.gd（GridSearch），這個腳本只負責畫圖和按鈕。
 ## 主題課示範用，匯出時排除；在編輯器裡打開 astar_lab.tscn 按 F6。
@@ -24,6 +25,11 @@ const ARROW_COLOR: Color = Color(0.1, 0.15, 0.45, 0.6)
 const NEXT_COLOR: Color = Color("b030d0")
 const HOVER_COLOR: Color = Color(0.1, 0.1, 0.12)
 const NO_CELL: Vector2i = Vector2i(-1, -1)
+## 比賽的三隻
+const RACE_WEIGHTS: Array[float] = [0.0, 1.0, 5.0]
+const RECORD_LIMIT: int = 30
+const RECORD_HEADERS: Array[String] = ["地圖", "演算法", "權重", "沼澤", "探索格數", "路徑格數", "總成本", "NPC 秒數"]
+const RACE_HEADERS: Array[String] = ["名次", "權重", "探索", "格數", "成本", "秒"]
 
 ## 格子裡要寫什麼（「顯示」選單的順序）
 enum Scores { NONE, TOTAL, PARTS }
@@ -37,6 +43,12 @@ var _drag: int = 0
 var _step_budget: float = 0.0
 ## 滑鼠停在哪一格（不在地圖上是 NO_CELL）
 var _hover: Vector2i = NO_CELL
+## 現在的地圖叫什麼（改過就是「自己畫的」），寫在紀錄表
+var _map_name: String = ""
+## 紀錄表：每一列是 RECORD_HEADERS 的順序
+var _records: Array[PackedStringArray] = []
+## 這次找路的紀錄在第幾列（還沒找完是 -1）
+var _record_index: int = -1
 
 @onready var _grid_view: Control = %GridView
 @onready var _algorithm: OptionButton = %AlgorithmOption
@@ -51,6 +63,12 @@ var _hover: Vector2i = NO_CELL
 @onready var _speed_label: Label = %SpeedLabel
 @onready var _stats: Label = %Stats
 @onready var _cell_info: Label = %CellInfo
+@onready var _walkers: Control = %Walkers
+@onready var _walk_label: Label = %WalkLabel
+@onready var _ranking: GridContainer = %Ranking
+@onready var _record_panel: Control = %RecordPanel
+@onready var _record_grid: GridContainer = %RecordGrid
+@onready var _tabs: TabContainer = %Tabs
 @onready var _preset: OptionButton = %PresetOption
 @onready var _slot: OptionButton = %SlotOption
 @onready var _brush: OptionButton = %BrushOption
@@ -88,9 +106,20 @@ func _ready() -> void:
 	_scores.item_selected.connect(func(_i: int) -> void: _grid_view.queue_redraw())
 	_arrows.toggled.connect(func(_on: bool) -> void: _grid_view.queue_redraw())
 	_swamp.value_changed.connect(_on_swamp_changed)
-	_play.toggled.connect(func(_on: bool) -> void: _grid_view.queue_redraw())
+	_play.toggled.connect(_on_play_toggled)
 	_speed.value_changed.connect(func(_v: float) -> void: _update_labels())
 	_preset.item_selected.connect(_on_preset_selected)
+	_tabs.set_tab_title(0, "這一格")
+	_tabs.set_tab_title(1, "走走看")
+	_walkers.cell_size = CELL
+	_walkers.arrived.connect(func(_i: int) -> void: _update_ranking())
+	_walkers.all_arrived.connect(_on_all_arrived)
+	(%WalkButton as Button).pressed.connect(_on_walk_pressed)
+	(%RaceButton as Button).pressed.connect(_on_race_pressed)
+	(%RecordButton as Button).pressed.connect(func() -> void: _record_panel.visible = not _record_panel.visible)
+	(%RecordCloseButton as Button).pressed.connect(func() -> void: _record_panel.hide())
+	(%RecordClearButton as Button).pressed.connect(_on_record_clear_pressed)
+	_update_records()
 	(%StepButton as Button).pressed.connect(_on_step_pressed)
 	(%ResetButton as Button).pressed.connect(_restart)
 	(%ClearButton as Button).pressed.connect(_on_clear_pressed)
@@ -102,6 +131,8 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	if _walkers.running:
+		_update_walk_label()
 	if not _play.button_pressed or search.finished:
 		_step_budget = 0.0
 		return
@@ -119,10 +150,14 @@ func _restart() -> void:
 	search.allow_diagonal = _diagonal.button_pressed
 	search.cut_corners = _corner.button_pressed
 	search.start()
+	_record_index = -1
+	_stop_walkers()
 	_refresh()
 
 
 func _refresh() -> void:
+	if search.finished and _record_index == -1:
+		_record_index = _add_record(search)
 	_update_labels()
 	_grid_view.queue_redraw()
 
@@ -143,17 +178,29 @@ func _update_labels() -> void:
 	if search.algorithm == GridSearch.Algorithm.BFS and not search.costs.is_empty():
 		state += "（BFS 不看沼澤）"
 	_stats.text = "探索了 %d 格（待探索 %d）\n路徑長度 %s\n%s" % [search.closed.size(), search.open.size(), length, state]
+	if _is_racing():
+		_stats.text = "比賽：A* 權重 0、1、5
+各找一條路，一起出發"
 	_cell_info.text = _describe_cell(_hover)
+
+
+func _on_play_toggled(_on: bool) -> void:
+	if _is_racing():
+		_stop_walkers()
+	_refresh()
 
 
 func _on_step_pressed() -> void:
 	_play.button_pressed = false
+	if _is_racing():
+		_stop_walkers()
 	search.step()
 	_refresh()
 
 
 func _on_preset_selected(index: int) -> void:
-	AStarPresets.apply(AStarPresets.MAPS[_preset.get_item_text(index)], search, _swamp.value)
+	_map_name = _preset.get_item_text(index)
+	AStarPresets.apply(AStarPresets.MAPS[_map_name], search, _swamp.value)
 	_restart()
 
 
@@ -165,6 +212,7 @@ func _on_swamp_changed(value: float) -> void:
 
 
 func _on_clear_pressed() -> void:
+	_map_name = "自己畫的"
 	search.walls.clear()
 	search.costs.clear()
 	_restart()
@@ -229,6 +277,7 @@ func _apply_drag(cell: Vector2i) -> void:
 			if is_endpoint or search.walls.has(cell):
 				return
 			search.goal_cell = cell
+	_map_name = "自己畫的"
 	_restart()
 
 
@@ -287,6 +336,143 @@ func _number(value: float) -> String:
 	return str(roundi(value)) if is_equal_approx(value, roundf(value)) else "%.1f" % value
 
 
+# ---- NPC 走走看、比賽 ----
+
+## 還沒找完就先找完，再讓 NPC 照路走一次
+func _on_walk_pressed() -> void:
+	_play.button_pressed = false
+	_stop_walkers()
+	search.run_to_end()
+	_record_index = maxi(_record_index, -1)                       # 紀錄被清掉過：重新記一列
+	_refresh()
+	if not search.found:
+		_walk_label.text = "走不到，NPC 不能出發"
+		return
+	_walkers.start([search] as Array[GridSearch])
+
+
+## 權重 0、1、5 各找一次（都用 A*），三隻一起出發
+func _on_race_pressed() -> void:
+	_play.button_pressed = false
+	_restart()
+	var racers: Array[GridSearch] = []
+	for w: float in RACE_WEIGHTS:
+		var racer: GridSearch = search.copy_map()
+		racer.weight = w
+		racer.start()
+		racer.run_to_end()
+		racers.append(racer)
+	if not racers[0].found:
+		_walk_label.text = "走不到，NPC 不能出發"
+		return
+	_walkers.start(racers)
+	_update_ranking()
+	_refresh()
+
+
+func _is_racing() -> bool:
+	return _walkers.searches.size() > 1
+
+
+func _stop_walkers() -> void:
+	_walkers.stop()
+	_walk_label.text = ""
+	_fill_grid(_ranking, [], [], [])
+
+
+func _update_walk_label() -> void:
+	_walk_label.text = "%s：%.1f 秒" % ["比賽中" if _is_racing() else "走路中", _walkers.elapsed]
+
+
+func _on_all_arrived() -> void:
+	if _is_racing():
+		_walk_label.text = "比賽結束"
+		_update_ranking()
+		for i: int in _walkers.searches.size():
+			_set_record_time(_add_record(_walkers.searches[i]), _walkers.time_of(i))
+		return
+	_walk_label.text = "花了 %s 秒\n＝總成本 %s × %s 秒" % [_seconds(_walkers.time_of(0)), _number(search.path_length()), str(_walkers.SECONDS_PER_CELL)]
+	_set_record_time(_record_index, _walkers.time_of(0))
+
+
+## 比賽的排行：先到的在上面，時間一樣就並列；還沒到的先不寫名次
+func _update_ranking() -> void:
+	if not _is_racing():
+		return
+	var order: Array = range(_walkers.searches.size())
+	order.sort_custom(func(a: int, b: int) -> bool:
+		if is_equal_approx(_walkers.time_of(a), _walkers.time_of(b)):
+			return a < b
+		return _walkers.time_of(a) < _walkers.time_of(b))
+	var rows: Array[PackedStringArray] = []
+	var colors: Array[Color] = []
+	for i: int in order:
+		var racer: GridSearch = _walkers.searches[i]
+		var faster: int = order.filter(func(j: int) -> bool: return _walkers.time_of(j) < _walkers.time_of(i) and not is_equal_approx(_walkers.time_of(i), _walkers.time_of(j))).size()
+		var here: bool = _walkers.has_arrived(i)
+		rows.append(PackedStringArray([str(faster + 1) if here else "－", _number(racer.weight), str(racer.closed.size()), str(racer.path_steps()), _number(racer.path_length()), _seconds(_walkers.time_of(i)) if here else "－"]))
+		colors.append(_walkers.COLORS[i].lightened(0.35))
+	_fill_grid(_ranking, RACE_HEADERS, rows, colors)
+
+
+## 秒數寫到小數第二位（0.15 秒一格），後面的 0 不寫
+func _seconds(value: float) -> String:
+	return str(snappedf(value, 0.01))
+
+
+# ---- 紀錄表 ----
+
+## 加一列，回傳是第幾列（NPC 還沒走，秒數先空著）
+func _add_record(run: GridSearch) -> int:
+	if _records.size() >= RECORD_LIMIT:
+		_records.pop_front()
+	var astar: bool = run.algorithm == GridSearch.Algorithm.ASTAR
+	_records.append(PackedStringArray([
+		_map_name, "A*" if astar else "BFS", _number(run.weight) if astar else "－",
+		"－" if run.costs.is_empty() else _number(_swamp.value),
+		str(run.closed.size()), str(run.path_steps()) if run.found else "走不到", _number(run.path_length()) if run.found else "－", "－"]))
+	_update_records()
+	return _records.size() - 1
+
+
+func _set_record_time(index: int, seconds: float) -> void:
+	if index >= 0 and index < _records.size():
+		_records[index][RECORD_HEADERS.size() - 1] = _seconds(seconds)
+		_update_records()
+
+
+func _on_record_clear_pressed() -> void:
+	_records.clear()
+	_record_index = -2 if search.finished else -1                 # -2：這次的紀錄被清掉了，不要再記一次
+	_update_records()
+
+
+func _update_records() -> void:
+	(%RecordButton as Button).text = "紀錄 %d" % _records.size()
+	_fill_grid(_record_grid, RECORD_HEADERS, _records, [])
+
+
+## 把表格重填一次：第一列是標題
+func _fill_grid(grid: GridContainer, headers: Array, rows: Array, colors: Array) -> void:
+	for child: Node in grid.get_children():
+		grid.remove_child(child)
+		child.queue_free()
+	for header: String in headers:
+		_add_grid_text(grid, header, Color(0.65, 0.65, 0.7))
+	for i: int in rows.size():
+		for text: String in rows[i]:
+			_add_grid_text(grid, text, colors[i] if i < colors.size() else Color.WHITE)
+
+
+func _add_grid_text(grid: GridContainer, text: String, color: Color) -> void:
+	var label: Label = Label.new()
+	label.text = text
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.add_theme_font_size_override("font_size", 22)
+	label.add_theme_color_override("font_color", color)
+	grid.add_child(label)
+
+
 # ---- 存讀自己畫的地圖 ----
 
 func _on_save_pressed() -> void:
@@ -305,6 +491,7 @@ func _on_load_pressed() -> void:
 	if rows is PackedStringArray and (rows as PackedStringArray).size() == search.size.y:
 		_swamp.set_value_no_signal(float(config.get_value("slot%d" % _slot.selected, "swamp_cost", AStarPresets.SWAMP_COST)))
 		AStarPresets.apply(Array(rows as PackedStringArray), search, _swamp.value)
+		_map_name = _slot.get_item_text(_slot.selected)
 		_restart()
 
 
@@ -334,7 +521,7 @@ func _draw_grid() -> void:
 	if _scores.selected != Scores.NONE:
 		for cell: Vector2i in search.g:
 			_draw_scores(cell)
-	if not _play.button_pressed and _in_map(search.peek_next()):    # 逐步：下一個要探索的格子
+	if not _play.button_pressed and not _is_racing() and _in_map(search.peek_next()):    # 逐步：下一個要探索的格子
 		_grid_view.draw_rect(_cell_rect(search.peek_next()).grow(-2), NEXT_COLOR, false, 4.0)
 	if _hover != NO_CELL:
 		_grid_view.draw_rect(_cell_rect(_hover), HOVER_COLOR, false, 2.0)
