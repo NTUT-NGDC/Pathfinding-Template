@@ -6,7 +6,9 @@ extends Node
 ## 4. 斜走：路比較短；不能穿牆角時不會貼著牆角斜切
 ## 5. 走不到的地圖：結束、沒有路
 ## 6. 沼澤：BFS 只算步數、直直穿過沼澤；A* 算成本、繞開沼澤，總成本比較低
-## 6. 實驗室場景打得開、按鈕按了不會當掉；存讀地圖
+## 7. 陷阱：權重 5 探索最少、路比權重 0 和 1 長；沼澤：權重 5 直穿沼澤、總成本比較高
+## 8. 平手先挑 h 小的、待探索不重複、下一格跟 step() 真的探索的一樣
+## 9. 實驗室場景打得開、按鈕按了不會當掉；沼澤成本、每格的算式、存讀地圖
 ##
 ## 在命令列執行：
 ##   godot --headless --path . res://addons/ngdc_pathfinding/tests/astar_lab_test.tscn
@@ -27,6 +29,8 @@ func _ready() -> void:
 	_test_diagonal()
 	_test_no_path()
 	_test_swamp()
+	_test_trap()
+	_test_order()
 	await _test_scene()
 
 	_failures += _script_errors.report()
@@ -126,6 +130,44 @@ func _test_swamp() -> void:
 	_expect(astar_swamp == 0, "A* 算成本：繞開沼澤")
 	_expect(astar.path_length() < bfs.path_length(), "A* 的總成本比較低（%.0f ＜ %.0f）" % [astar.path_length(), bfs.path_length()])
 	_expect(is_equal_approx(astar.path_length(), dijkstra.path_length()), "權重 0（Dijkstra）和 A* 成本一樣")
+	var greedy: GridSearch = _run("沼澤", GridSearch.Algorithm.ASTAR, 5.0, false)
+	_expect(greedy.path.any(func(c: Vector2i) -> bool: return greedy.costs.has(c)), "權重 5 直直穿過沼澤")
+	_expect(greedy.path_steps() < astar.path_steps() and greedy.path_length() > astar.path_length(), "權重 5 走的格子少（%d ＜ %d）、總成本高（%.0f ＞ %.0f）" % [greedy.path_steps(), astar.path_steps(), greedy.path_length(), astar.path_length()])
+
+
+func _test_trap() -> void:
+	print("--- 陷阱 ---")
+	var w0: GridSearch = _run("陷阱", GridSearch.Algorithm.ASTAR, 0.0, false)
+	var w1: GridSearch = _run("陷阱", GridSearch.Algorithm.ASTAR, 1.0, false)
+	var w5: GridSearch = _run("陷阱", GridSearch.Algorithm.ASTAR, 5.0, false)
+	_expect(w5.closed.size() < w1.closed.size() and w1.closed.size() < w0.closed.size(), "探索格數：權重 0 ＞ 1 ＞ 5（%d、%d、%d）" % [w0.closed.size(), w1.closed.size(), w5.closed.size()])
+	_expect(w5.path_steps() > w1.path_steps() and w0.path_steps() == w1.path_steps(), "權重 5 的路比較長（%d ＞ %d）" % [w5.path_steps(), w1.path_steps()])
+
+
+func _test_order() -> void:
+	print("--- 先挑哪一格 ---")
+	var search: GridSearch = GridSearch.new()
+	AStarPresets.apply(["S....", ".....", "....G"], search)
+	search.start()
+	search.step()
+	search.step()
+	_expect(search.estimate(search.peek_next()) == 4.0, "平手（總分都是 6）：先挑 h 小的（h＝%.0f）" % search.estimate(search.peek_next()))
+	var same: bool = true
+	var unique: bool = true
+	for map_name: String in AStarPresets.MAPS:
+		for w: float in [0.0, 1.0, 5.0]:
+			AStarPresets.apply(AStarPresets.MAPS[map_name], search)
+			search.weight = w
+			search.start()
+			while not search.finished:
+				var next: Vector2i = search.peek_next()
+				search.step()
+				same = same and search.closed.has(next)
+				for cell: Vector2i in search.open:
+					unique = unique and search.open.count(cell) == 1 and not search.closed.has(cell)
+			same = same and search.closed.size() > 0 and search.peek_next() == Vector2i(-1, -1)
+	_expect(same, "peek_next() 就是下一步探索的格子，找完是 (-1, -1)")
+	_expect(unique, "待探索的格子不重複，也不會有已探索的")
 
 
 func _test_scene() -> void:
@@ -143,7 +185,9 @@ func _test_scene() -> void:
 		(lab.get_node("%StepButton") as Button).pressed.emit()
 	var stats: Label = lab.get_node("%Stats")
 	_expect(stats.text.contains("探索了") and stats.text.contains("路徑長度"), "顯示探索格數和路徑長度（%s）" % stats.text.replace("\n", "／"))
-	(lab.get_node("%ScoresCheck") as CheckBox).button_pressed = true
+	await _test_cell_info(lab)
+	(lab.get_node("%ScoresOption") as OptionButton).select(2)
+	(lab.get_node("%ArrowsCheck") as CheckBox).button_pressed = true
 	(lab.get_node("%DiagonalCheck") as CheckBox).button_pressed = true
 	(lab.get_node("%WeightSlider") as HSlider).value = 5.0
 	(lab.get_node("%ResetButton") as Button).pressed.emit()
@@ -154,12 +198,42 @@ func _test_scene() -> void:
 	var search: GridSearch = lab.get("search")
 	search.walls[Vector2i(5, 5)] = true
 	search.costs[Vector2i(6, 6)] = 3.0
+	(lab.get_node("%SwampSlider") as HSlider).value = 7.0
+	_expect(search.costs[Vector2i(6, 6)] == 7.0, "沼澤成本滑桿：地圖上的沼澤跟著變")
 	(lab.get_node("%SaveButton") as Button).pressed.emit()
 	search.walls.clear()
+	(lab.get_node("%SwampSlider") as HSlider).value = 2.0
 	(lab.get_node("%LoadButton") as Button).pressed.emit()
 	search = lab.get("search")
 	_expect(search.walls.has(Vector2i(5, 5)) and search.costs.has(Vector2i(6, 6)), "存檔再讀檔：牆和沼澤都還在")
+	_expect(search.costs[Vector2i(6, 6)] == 7.0 and (lab.get_node("%SwampSlider") as HSlider).value == 7.0, "存檔再讀檔：沼澤成本也還在")
 	lab.queue_free()
+
+
+## 滑鼠停在格子上：算式對得起來
+func _test_cell_info(lab: Control) -> void:
+	var search: GridSearch = lab.get("search")
+	var view: Control = lab.get_node("%GridView")
+	var info: Label = lab.get_node("%CellInfo")
+	var motion: InputEventMouseMotion = InputEventMouseMotion.new()
+	var cell: Vector2i = search.path[3]
+	motion.position = Vector2(cell * 36) + Vector2(18, 18)
+	view.gui_input.emit(motion)
+	_expect(info.text.contains("總分 17＝3＋1×14") and info.text.contains("路徑") and info.text.contains("從 (%d, %d) 走過來" % [search.path[2].x, search.path[2].y]), "路徑上的格子：算式、狀態、從哪來（%s）" % info.text.replace("\n", "／"))
+	motion.position = Vector2(14 * 36 + 18, 7 * 36 + 18)
+	view.gui_input.emit(motion)
+	_expect(info.text.contains("牆"), "牆：寫不能走")
+	var algorithm: OptionButton = lab.get_node("%AlgorithmOption")
+	algorithm.select(0)
+	algorithm.item_selected.emit(0)
+	motion.position = Vector2(search.start_cell * 36) + Vector2(18, 18)
+	view.gui_input.emit(motion)
+	_expect(info.text.contains("BFS 不算分數"), "BFS：不寫算式")
+	algorithm.select(1)
+	algorithm.item_selected.emit(1)
+	view.mouse_exited.emit()
+	_expect(info.text.contains("滑鼠停在格子上"), "滑鼠離開：回到說明")
+	await get_tree().process_frame
 
 
 func _run(map_name: String, algorithm: GridSearch.Algorithm, weight: float, diagonal: bool) -> GridSearch:

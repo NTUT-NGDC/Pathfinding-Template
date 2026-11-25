@@ -29,7 +29,7 @@ var allow_diagonal: bool = false
 var cut_corners: bool = false
 
 # ---- 過程 ----
-## 待探索的格子（BFS 是排隊，A* 每次挑分數最低的）
+## 待探索的格子（BFS 是排隊，A* 每次挑分數最低的），同一格只會有一個
 var open: Array[Vector2i] = []
 ## 已探索的格子
 var closed: Dictionary[Vector2i, bool] = {}
@@ -60,9 +60,7 @@ func step() -> void:
 	if open.is_empty():
 		finished = true                                           # 沒有格子可以找了：走不到
 		return
-	var current: Vector2i = _take_next()                          # BFS 拿最早排隊的；A* 拿分數最低的
-	if closed.has(current):
-		return                                                    # 已經找過了（A* 可能重複加進來）
+	var current: Vector2i = open.pop_at(_next_index())            # BFS 拿最早排隊的；A* 拿分數最低的
 	closed[current] = true
 	if current == goal_cell:
 		finished = true                                           # 找到終點了！
@@ -70,15 +68,18 @@ func step() -> void:
 		path = _trace_back(current)
 		return
 	for next: Vector2i in neighbors(current):
+		if closed.has(next):
+			continue                                              # 已經找過了，不再改
 		var new_g: float = g[current] + _step_cost(current, next)
 		if algorithm == Algorithm.BFS:
 			if g.has(next):
 				continue                                          # BFS：水已經流過的格子不再流
 		elif g.has(next) and new_g >= g[next]:
 			continue                                              # A*：這條路沒有比較近，不用更新
+		if not g.has(next):
+			open.append(next)
 		g[next] = new_g
 		came_from[next] = current                                 # 記住是從哪一格走過來的
-		open.append(next)
 
 
 ## 每一格的分數＝走了多少＋估計還剩多少 × 權重（BFS 不用分數）
@@ -86,7 +87,7 @@ func score(cell: Vector2i) -> float:
 	return g.get(cell, 0.0) + weight * estimate(cell)
 
 
-## 估計離終點還有多遠：不管牆，直接量距離
+## 估計離終點還有多遠：不管牆，直接量距離（每格都當成最便宜的成本 1，所以不會高估）
 func estimate(cell: Vector2i) -> float:
 	var d: Vector2i = (goal_cell - cell).abs()
 	if not allow_diagonal:
@@ -94,16 +95,25 @@ func estimate(cell: Vector2i) -> float:
 	return maxi(d.x, d.y) - mini(d.x, d.y) + DIAGONAL_COST * mini(d.x, d.y)   # 能斜走：先斜再直
 
 
-func _take_next() -> Vector2i:
+## 下一步會探索哪一格（找完了就是 (-1, -1)）
+func peek_next() -> Vector2i:
+	return Vector2i(-1, -1) if finished or open.is_empty() else open[_next_index()]
+
+
+func _next_index() -> int:
 	if algorithm == Algorithm.BFS:
-		return open.pop_front()                                   # BFS：先來先找（水一圈一圈擴散）
+		return 0                                                  # BFS：先來先找（水一圈一圈擴散）
 	var best: int = 0
+	var best_score: float = score(open[0])
 	for i: int in range(1, open.size()):
-		if score(open[i]) < score(open[best]):
+		var value: float = score(open[i])
+		if is_equal_approx(value, best_score):
+			if estimate(open[i]) < estimate(open[best]):          # 平手：先挑估計離終點比較近的（h 小的）
+				best = i
+		elif value < best_score:
 			best = i
-	var cell: Vector2i = open[best]
-	open.remove_at(best)
-	return cell
+			best_score = value
+	return best
 
 
 ## 旁邊可以走的格子
@@ -124,6 +134,11 @@ func neighbors(cell: Vector2i) -> Array[Vector2i]:
 
 func is_free(cell: Vector2i) -> bool:
 	return cell.x >= 0 and cell.y >= 0 and cell.x < size.x and cell.y < size.y and not walls.has(cell)
+
+
+## 路徑走了幾格（起點不算）
+func path_steps() -> int:
+	return maxi(path.size() - 1, 0)
 
 
 ## 路徑的總成本（斜走一步算 1.41，走進沼澤再乘上沼澤的成本）

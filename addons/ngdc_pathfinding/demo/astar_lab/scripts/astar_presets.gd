@@ -1,9 +1,9 @@
 class_name AStarPresets
 extends RefCounted
-## A* 實驗室內建的地圖。# 是牆、~ 是沼澤（走進去成本 3）、S 是起點、G 是終點、. 是空地。每張 24×16。
+## A* 實驗室內建的地圖。# 是牆、~ 是沼澤、S 是起點、G 是終點、. 是空地。每張 24×16。
 ## 想加新地圖：照格式在 MAPS 加一張，名字會自動出現在實驗室的選單裡。
 
-## 沼澤走進去的成本
+## 沼澤走進去的成本（預設；實驗室的滑桿可以改）
 const SWAMP_COST: float = 3.0
 
 const MAPS: Dictionary[String, Array] = {
@@ -79,6 +79,24 @@ const MAPS: Dictionary[String, Array] = {
 		"........................",
 		"........................",
 	],
+	"陷阱": [
+		"........................",
+		"........................",
+		"........................",
+		".......###########......",
+		".......#.#...#...#......",
+		".......#.#.#.#.#.#......",
+		".......#.#.#.#.#.#......",
+		"...S.....#.#.#.#....G...",
+		".......#.#.#.#.#.#......",
+		".......#.#.#.#.#.#......",
+		".......#...#...#.#......",
+		".......###########......",
+		"........................",
+		"........................",
+		"........................",
+		"........................",
+	],
 	"投影片 7": [
 		"........................",
 		"........................",
@@ -101,7 +119,7 @@ const MAPS: Dictionary[String, Array] = {
 
 
 ## 讀一張地圖到 search（牆、起點、終點）
-static func apply(map: Array, search: GridSearch) -> void:
+static func apply(map: Array, search: GridSearch, swamp_cost: float = SWAMP_COST) -> void:
 	search.walls.clear()
 	search.costs.clear()
 	search.size = Vector2i(map[0].length(), map.size())
@@ -110,7 +128,7 @@ static func apply(map: Array, search: GridSearch) -> void:
 		for x: int in row.length():
 			match row[x]:
 				"#": search.walls[Vector2i(x, y)] = true
-				"~": search.costs[Vector2i(x, y)] = SWAMP_COST
+				"~": search.costs[Vector2i(x, y)] = swamp_cost
 				"S": search.start_cell = Vector2i(x, y)
 				"G": search.goal_cell = Vector2i(x, y)
 
