@@ -4,6 +4,12 @@
 
 這個 repo ＝ [起手包 Godot-GameJam-Tools](https://github.com/NTUT-NGDC/Godot-GameJam-Tools) ＋ 尋路積木（`addons/ngdc_pathfinding/`）＋ 3 個範例遊戲（`examples/`）。積木拖進場景、改檢查器就能用，沒有 AI 也能組出遊戲。
 
+## 📖 學員手冊
+
+**👉 [交流會學員手冊（Notion）](https://app.notion.com/p/2949b83c066846079f3a609f8808d513?source=copy_link)**
+
+操作步驟、組隊協作、匯出上傳、常見問題都在手冊裡，上課時打開 W3 尋路那一頁照著做就好。
+
 ## 需要準備
 
 | 項目 | 版本 | 說明 |
